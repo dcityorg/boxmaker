@@ -436,7 +436,7 @@ export async function buildPositionedTextLabel(
   }
 
   // 2. Extrude to a slab centered on origin along Z.
-  let slab = Manifold.extrude(xs, label.depth, undefined, undefined, undefined, true);
+  const slab = Manifold.extrude(xs, label.depth, undefined, undefined, undefined, true);
   xs.delete();
 
   const isEmboss = label.type === 'emboss';

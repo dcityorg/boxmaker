@@ -74,7 +74,7 @@ export function TextLabelsControls() {
           Bundled fonts: <code className="not-italic">{BUNDLED_FONT_NAMES.join(', ')}</code>
         </div>
         <div>
-          Use <code className="not-italic">//</code> for comments
+          Use <code className="not-italic">{'//'}</code> for comments
         </div>
       </div>
 

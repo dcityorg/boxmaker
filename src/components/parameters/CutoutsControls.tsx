@@ -30,7 +30,7 @@ export function CutoutsControls() {
         <div>Lid: 0,0 inside shoulder pocket at back-left; +Y grows to front.</div>
         <div>HoleX, HoleY = rectangle width and height (Rect only)</div>
         <div>
-          Use <code className="not-italic">//</code> for comments
+          Use <code className="not-italic">{'//'}</code> for comments
         </div>
       </div>
       <textarea

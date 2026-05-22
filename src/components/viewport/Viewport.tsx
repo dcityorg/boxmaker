@@ -154,9 +154,9 @@ export function Viewport() {
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
   const tweenRef = useRef<TweenState | null>(null);
 
-  const initial = useMemo(() => computeHomeView(box, lid), []);
   // Note: initial values only — OrbitControls owns the camera after mount.
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  const initial = useMemo(() => computeHomeView(box, lid), []);
   const { extent, cameraPos, target } = initial;
 
   // Build the target Quaternion implied by (position, target, up). Mirrors

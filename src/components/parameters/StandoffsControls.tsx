@@ -26,7 +26,7 @@ export function StandoffsControls() {
         <div>Floor: 0,0 at lower-left of top view (interior back-right)</div>
         <div>Lid: 0,0 inside shoulder pocket at back-left; +Y to front</div>
         <div>
-          Use <code className="not-italic">//</code> for comments
+          Use <code className="not-italic">{'//'}</code> for comments
         </div>
       </div>
       <textarea
