@@ -168,12 +168,32 @@ const HELP_SECTIONS: HelpSection[] = [
         type: 'table',
         headers: ['Parameter', 'Effect'],
         rows: [
-          ['`Nub height`', 'Wall-side length of the triangle. Apex depth = half of this. Default 3 mm. Don\'t exceed `Shoulder wall` thickness or the cavity will visibly break through.'],
-          ['`Lid lead-in`', '45-degree chamfer on the lower-outer edge of the lid cutout -- eases the nub past first contact. 1.0 mm default works for typical PETG/PLA.'],
+          ['`Nub height`', 'Wall-side length of the triangle. Apex depth = half of this. Default 2 mm.'],
+          ['`Lid lead-in`', '45-degree chamfer on the lower-outer edge of the lid cutout -- eases the nub past first contact. 0.9 mm default works for typical PETG/PLA.'],
           ['`Width %`', 'Nub width as a percent of interior wall length (default 20%).'],
           ['`Min width` / `Max width`', 'Clamps on the percentage so very small / very long boxes still get sensible nubs.'],
           ['`Box shrink`', 'How much narrower the box nub is than the lid cavity (default 2 mm), for easier alignment during insertion.'],
         ],
+      },
+      { type: 'heading', text: 'Geometric constraints' },
+      {
+        type: 'paragraph',
+        text:
+          'Four sanity checks on the nub geometry. The sidebar shows an amber warning when any of these is violated:',
+      },
+      {
+        type: 'list',
+        items: [
+          '`Nub height / 2` must not exceed `Lid shoulder wall`. The cavity opens on the outer face of the shoulder (so the nub can enter) and its apex extends inward through the shoulder material. If the apex is deeper than the shoulder is thick, the cavity pokes through to the inner face of the shoulder (the side facing into the pocket).',
+          '`Nub height` must not exceed `Lid shoulder depth`. The cavity has the same vertical span as the nub; if the nub is taller than the shoulder, the cavity extends past the shoulder bottom and the nub can\'t seat.',
+          '`Nub height` below 2 mm tends to print poorly -- the small triangular ridge under-extrudes or loses definition on typical FDM printers.',
+          '`Nub height` above 5 mm makes the lid hard to seat -- walls don\'t flex enough to pass that much apex during insertion.',
+        ],
+      },
+      {
+        type: 'paragraph',
+        text:
+          'Box size also matters: shorter boxes typically need smaller nubs (walls don\'t flex as much during insertion); taller boxes can take larger nubs. The 2-5 mm range is the practical sweet spot for typical box sizes.',
       },
       {
         type: 'tip',
@@ -192,7 +212,7 @@ const HELP_SECTIONS: HelpSection[] = [
           'PCB-mount cylinders rising from the floor (or hanging from the lid). Optional concentric screw hole and base fillet. One standoff per line, comma-delimited; `//` starts a comment.',
       },
       { type: 'heading', text: 'Format' },
-      { type: 'code', text: 'Surface,X,Y,OD,Height,HoleDia,HoleDepth,BaseFillet' },
+      { type: 'code', text: 'Surface,X,Y,OD,Height,HoleDia,HoleDepth,BaseFilletRadius' },
       { type: 'heading', text: 'Fields' },
       {
         type: 'table',
@@ -272,15 +292,15 @@ left,Round,30,15,4`,
           'Embossed (raised) or debossed (recessed) text on any surface. 11 comma-separated fields per line; commas inside the `Text` field are preserved verbatim. `//` starts a comment line.',
       },
       { type: 'heading', text: 'Format' },
-      { type: 'code', text: 'Surface,Type,X,Y,Depth,Height,Direction,Font,Bold,SeparateBody,Text' },
+      { type: 'code', text: 'Surface,X,Y,Type,Depth,Height,Direction,Font,Bold,SeparateBody,Text' },
       { type: 'heading', text: 'Fields' },
       {
         type: 'table',
         headers: ['Field', 'Meaning'],
         rows: [
           ['`Surface`', '`front`, `back`, `left`, `right`, `floor`, `lid`'],
-          ['`Type`', '`emboss` (raised) or `deboss` (recessed)'],
           ['`X`, `Y`', 'Center of the text bounding box'],
+          ['`Type`', '`emboss` (raised) or `deboss` (recessed)'],
           ['`Depth`', 'Protrusion / recess depth (0.4-0.8 mm typical)'],
           ['`Height`', 'Glyph cap-height (4-8 mm typical)'],
           ['`Direction`', 'Names the box edge the TOP of the glyphs points toward (see below)'],
@@ -331,14 +351,14 @@ left,Round,30,15,4`,
         type: 'code',
         text:
 `// Walls -- upright text
-front,emboss,48,25,0.5,5,lid,Atkinson Hyperlegible,no,no,POWER
-back,deboss,40,20,0.4,4,lid,Open Sans,no,no,SN-001
+front,48,25,emboss,0.5,5,lid,Atkinson Hyperlegible,no,no,POWER
+back,40,20,deboss,0.4,4,lid,Open Sans,no,no,SN-001
 
 // Lid -- separate body for multi-color
-lid,emboss,44,15,0.6,4,back,JetBrains Mono,no,yes,v1.0
+lid,44,15,emboss,0.6,4,back,JetBrains Mono,no,yes,v1.0
 
 // Floor -- maker's mark (auto-mirrored)
-floor,deboss,48,33,0.4,4,back,Open Sans,no,no,Made by Gary`,
+floor,48,33,deboss,0.4,4,back,Open Sans,no,no,Made by Gary`,
       },
     ],
   },
@@ -351,28 +371,42 @@ floor,deboss,48,33,0.4,4,back,Open Sans,no,no,Made by Gary`,
         text:
           'Each surface has its own 2D frame. (X, Y) measures how far the feature\'s center is from that surface\'s origin, in mm. The origin for each surface is chosen to match the user\'s natural perspective for that face.',
       },
-      { type: 'heading', text: 'Lid' },
-      {
-        type: 'paragraph',
-        text:
-          '`(0, 0)` at the back-left inner corner of the shoulder pocket -- the "bottom-left" when you lie inside the box, head against the back wall, looking up at the lid. `+X` grows toward the right of the box (world `+X`); `+Y` grows toward the front of the box. The inner corner radius is ignored -- `(0, 0)` references the square corner.',
-      },
       { type: 'heading', text: 'Floor' },
       {
         type: 'paragraph',
         text:
-          '`(0, 0)` at the interior back-right corner -- the "lower-left" when looking down at the box from above. Matches Fusion BoxMaker. `+X` grows toward the left of the box; `+Y` grows toward the front.',
+          '`(0, 0)` at the interior FRONT-LEFT corner -- the natural "lower-left when looking down at the box with the front edge near you" origin. `+X` grows toward the right of the box; `+Y` grows toward the back. Standard right-handed sketch convention.',
+      },
+      { type: 'heading', text: 'Lid' },
+      {
+        type: 'paragraph',
+        text:
+          '`(0, 0)` at the FRONT-RIGHT inner corner of the shoulder pocket -- the "lower-left" when looking up at the lid from inside the box. The X axis is mirrored from the floor because the lid\'s underside is what you see from inside (looking up mirrors left/right). `+X` grows toward the LEFT of the box; `+Y` grows toward the back. The inner corner radius is ignored -- `(0, 0)` references the square corner.',
       },
       { type: 'heading', text: 'Walls (front, back, left, right)' },
       {
         type: 'paragraph',
         text:
-          '`(0, 0)` at the interior bottom-left when viewed from OUTSIDE the box, looking at that wall. `+X` grows to the viewer\'s right; `+Y` grows upward (world `+Z`). Standard CAD-sketch convention on each face.',
+          '`(0, 0)` at the interior bottom-left when viewed from INSIDE the box (standing inside, facing the wall). `+X` grows along the wall to the viewer\'s right from inside; `+Y` grows upward toward the lid (world `+Z`).',
+      },
+      {
+        type: 'list',
+        items: [
+          '**Front** wall: viewed from inside, your right is toward the box\'s LEFT side; user `+X` runs toward box `-X`.',
+          '**Back** wall: viewed from inside, your right is toward the box\'s RIGHT side; user `+X` runs toward box `+X`.',
+          '**Left** wall: viewed from inside, your right is toward the box\'s BACK; user `+X` runs toward box `+Y`.',
+          '**Right** wall: viewed from inside, your right is toward the box\'s FRONT; user `+X` runs toward box `-Y`.',
+        ],
       },
       {
         type: 'tip',
         text:
           'Toggle Show Rulers in Settings to see tick-marked world X / Y / Z axes overlaid on the viewport. Useful when you\'re lining up a feature against another and want to see absolute world coordinates.',
+      },
+      {
+        type: 'tip',
+        text:
+          'Toggle Show Origins in Settings to drop a small red marker at each surface\'s (0, 0) corner (offset 3 mm so it clears the inner corner radius) with `+X` / `+Y` axis labels showing the user-frame directions. Helps when you\'re first learning a surface\'s coord frame.',
       },
     ],
   },
@@ -458,6 +492,12 @@ floor,deboss,48,33,0.4,4,back,Open Sans,no,no,Made by Gary`,
         text:
           'Every edit debounce-writes to `localStorage` 500 ms after you stop typing -- a page reload picks back up where you left off. If you open a Share Link URL, that design loads instead of the `localStorage` copy; the hash is cleared after load.',
       },
+      { type: 'heading', text: 'Custom font persistence' },
+      {
+        type: 'paragraph',
+        text:
+          'An uploaded custom font is cached in IndexedDB (per-browser, per-origin) and restored on the next page load. Switching browsers or devices still requires re-uploading the font, unless you transport the design via a saved `.boxmaker.json` (which embeds the font as base64). Use the `clear` link next to the active font name to remove the cached font.',
+      },
     ],
   },
   {
@@ -474,7 +514,7 @@ floor,deboss,48,33,0.4,4,back,Open Sans,no,no,Made by Gary`,
       {
         type: 'list',
         items: [
-          'Default `Lid lead-in` of 1.0 mm works for typical PETG/PLA on a well-tuned printer',
+          'Default `Lid lead-in` of 0.9 mm works for typical PETG/PLA on a well-tuned printer',
           'Lid won\'t close: decrease `Lid lead-in` (try 0.6 or 0.8)',
           'Lid pops off too easily: increase `Lid lead-in` (try 1.2 or 1.5)',
           'Walls too thin to engage cleanly: increase `Shoulder wall` (lid) or `Wall` (box) thickness',
@@ -496,6 +536,63 @@ floor,deboss,48,33,0.4,4,back,Open Sans,no,no,Made by Gary`,
         type: 'tip',
         text:
           'First-layer adhesion matters more for multi-material prints because the colored portion IS the first layer. Use a textured PEI plate or a glue stick if you see lifting at the corners.',
+      },
+    ],
+  },
+  {
+    id: 'faq',
+    title: 'Common Questions',
+    blocks: [
+      { type: 'heading', text: 'Why textareas instead of clickable form rows?' },
+      {
+        type: 'paragraph',
+        text:
+          'Textareas are denser (you can see your entire feature list at a glance), faster to bulk-edit (paste 20 standoffs from a spreadsheet), and trivially copy-paste-shareable. The project initially planned a list-of-cards UI; we switched to textareas after trying both. The Fusion 360 BoxMaker add-in uses the same pattern.',
+      },
+      { type: 'heading', text: 'Can I bulk-edit by pasting from a spreadsheet?' },
+      {
+        type: 'paragraph',
+        text:
+          'Yes -- CSV from Excel / Numbers pastes correctly. Use comma delimiters, no quotes around values.',
+      },
+      { type: 'heading', text: 'Why are some characters rendering oddly in the textareas?' },
+      {
+        type: 'paragraph',
+        text:
+          'Different fonts handle some Unicode characters differently. For best results stick to ASCII in the textareas; the geometry pipeline only interprets the field separators (`,`) and comment marker (`//`).',
+      },
+      { type: 'heading', text: 'Why does my floor text look mirrored from above?' },
+      {
+        type: 'paragraph',
+        text:
+          'By design. The floor text is auto-flipped so it reads correctly when the box is physically turned over to look at its underside. From above (looking into the box), the floor text appears mirrored -- that is the correct behavior.',
+      },
+      { type: 'heading', text: 'Why is my wall label upside down?' },
+      {
+        type: 'paragraph',
+        text:
+          'Check the `Direction` field. `Direction=floor` makes the top of the letters point toward the floor edge (downward). For upright text on a wall, use `Direction=lid`.',
+      },
+      { type: 'heading', text: 'How do I share a design with someone?' },
+      {
+        type: 'list',
+        items: [
+          'Same machine, same browser: keep working -- localStorage auto-saves.',
+          'Different person, simple design: `Share Link` button. They paste the URL.',
+          'Different person, design uses a custom font or is very complex: `Save Design`, send them the `.boxmaker.json`. They use `Load`.',
+        ],
+      },
+      { type: 'heading', text: 'How do I change the viewport colors?' },
+      {
+        type: 'paragraph',
+        text:
+          'The Settings group has Box Color and Lid Color pickers. Both affect the viewport only -- they do not change the exported geometry.',
+      },
+      { type: 'heading', text: 'Is the home view configurable?' },
+      {
+        type: 'paragraph',
+        text:
+          'Not directly, but you have alternatives. The Home button (top-right of the viewport, just below the ViewCube) re-frames the current box in a fixed 3/4 isometric view. Click any face of the ViewCube to snap to that orthographic view, or use the numpad shortcuts (`1/3/7` for front/right/top, Ctrl + same for the opposite face, `.` to re-frame).',
       },
     ],
   },
@@ -565,12 +662,16 @@ function renderBlock(block: Block, index: number) {
         </div>
       );
     case 'code':
+      // Inject a zero-width space after each comma so long comma-separated
+      // format strings wrap AT commas (never mid-token) when the panel is
+      // narrow. The U+200B character is invisible but counts as a soft
+      // break opportunity for the browser's line-breaking algorithm.
       return (
         <pre
           key={index}
-          className="text-[11px] font-mono bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded p-2 mb-3 overflow-x-auto text-[var(--text-primary)] leading-relaxed whitespace-pre"
+          className="text-[11px] font-mono bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded p-2 mb-3 text-[var(--text-primary)] leading-relaxed whitespace-pre-wrap"
         >
-          {block.text}
+          {block.text.replace(/,/g, ',​')}
         </pre>
       );
     case 'table':

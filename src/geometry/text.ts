@@ -114,10 +114,34 @@ export async function loadFont(name: string, bold = false): Promise<opentype.Fon
  */
 export function registerCustomFont(name: string, font: opentype.Font, buffer: ArrayBuffer): void {
   customFont = { name, entry: { font, buffer } };
+  notifyCustomFontListeners();
 }
 
 export function clearCustomFonts(): void {
   customFont = null;
+  notifyCustomFontListeners();
+}
+
+/**
+ * Subscribe to changes in the active custom font (register / clear). Used by
+ * UI components that mirror the font name -- on mount they pick up whatever
+ * is already active (e.g., restored from IndexedDB by useAutoSave), and any
+ * subsequent change fires the listener.
+ *
+ * Returns an unsubscribe function.
+ */
+type CustomFontListener = () => void;
+const customFontListeners = new Set<CustomFontListener>();
+
+export function subscribeToCustomFont(listener: CustomFontListener): () => void {
+  customFontListeners.add(listener);
+  return () => {
+    customFontListeners.delete(listener);
+  };
+}
+
+function notifyCustomFontListeners(): void {
+  customFontListeners.forEach((l) => l());
 }
 
 /* -------------------------------------------------------------------------- */
@@ -333,8 +357,10 @@ export async function buildTextSlab(
  *
  * Per-surface 2D frame in world coords (see useDesign.ts for the user-facing
  * convention):
- *   lid:   user X = +X world, user Y = -Y world (default top = world -Y front)
- *   floor: user X = -X world, user Y = -Y world (default top = world -Y front)
+ *   lid:   user X = -X world (mirrored from outside view), user Y = +Y world
+ *          (default top = world +Y back)
+ *   floor: user X = +X world, user Y = +Y world (default top = world -Y front,
+ *                                                via the slab's 180-X flip)
  *   front: user X = +X world, user Y = +Z world (default top = world +Z up)
  *   back:  user X = -X world, user Y = +Z world (default top = world +Z up)
  *   left:  user X = -Y world, user Y = +Z world (default top = world +Z up)
@@ -362,10 +388,9 @@ function textDirectionRotation(surface: TextLabelSurface, direction: TextLabelDi
       // Floor's surface rotation is 180 deg around X axis. That flips Y and
       // Z but LEAVES X alone, so the text 2D frame in world is:
       //   2D +X = world +X, 2D +Y = world -Y (front of box).
-      // The position formula DOES flip user X (Fusion top-view convention),
-      // but that's separate from the text 2D direction. So left/right
-      // rotations match the lid (NOT mirrored as the previous comment
-      // claimed).
+      // The position formula does NOT flip user X (front-left origin,
+      // standard right-handed sketch convention). Direction rotations match
+      // the lid since the slab's world-frame X is unchanged.
       if (direction === 'front') return 0;
       if (direction === 'back')  return 180;
       if (direction === 'left')  return 90;   // +Y user -> -X user (world -X)
@@ -447,9 +472,13 @@ export async function buildPositionedTextLabel(
   switch (label.surface) {
     case 'lid': {
       // Outward = +Z. Outer face = top of plate.
+      // Lid 0,0 at FRONT-LEFT of shoulder pocket as viewed from INSIDE the
+      // box; user +X = world -X (left), user +Y = world +Y (back). The X
+      // axis is mirrored compared to the floor because the inside-up view
+      // of the lid is the mirror of looking down at the top.
       const inset = box.wallThickness + lid.boxGap + lid.coverShoulderWallThickness;
-      const wx = -box.length / 2 + inset + label.x;
-      const wy = +box.width / 2 - inset - label.y;
+      const wx = +box.length / 2 - inset - label.x;
+      const wy = -box.width / 2 + inset + label.y;
       const topOfPlate = lid.coverShoulderDepth + lid.coverThicknessAtEdge;
       const wz = isEmboss
         ? topOfPlate + label.depth / 2
@@ -459,10 +488,12 @@ export async function buildPositionedTextLabel(
     case 'floor': {
       // Outward = -Z. Flip slab so depth goes -Z; also flips text Y so it
       // reads correctly from below (the flipped-box view).
+      // Floor 0,0 at interior FRONT-LEFT corner; user +X = world +X (right),
+      // user +Y = world +Y (back).
       const flipped = slab.rotate([180, 0, 0]);
       slab.delete();
-      const wx = +box.length / 2 - box.wallThickness - label.x;
-      const wy = +box.width / 2 - box.wallThickness - label.y;
+      const wx = -box.length / 2 + box.wallThickness + label.x;
+      const wy = -box.width / 2 + box.wallThickness + label.y;
       const wz = isEmboss
         ? -label.depth / 2
         : label.depth / 2 - COPLANAR_EPS;
@@ -470,9 +501,11 @@ export async function buildPositionedTextLabel(
     }
     case 'front': {
       // Outward = -Y. 90-deg around X sends slab +Z to -Y.
+      // Position: 0,0 at interior bottom-left viewed from inside the box.
+      // For front wall, inside-view-left = box's +X side.
       const r = slab.rotate([90, 0, 0]);
       slab.delete();
-      const wx = -box.length / 2 + box.wallThickness + label.x;
+      const wx = +box.length / 2 - box.wallThickness - label.x;
       const wz = box.floorThickness + label.y;
       const wy = isEmboss
         ? -box.width / 2 - label.depth / 2
@@ -481,11 +514,13 @@ export async function buildPositionedTextLabel(
     }
     case 'back': {
       // Outward = +Y. -90 around X then 180 around Y sends +Z to +Y, -X is user-X.
+      // Position: 0,0 at interior bottom-left viewed from inside the box.
+      // For back wall, inside-view-left = box's -X side.
       const r1 = slab.rotate([-90, 0, 0]);
       slab.delete();
       const r2 = r1.rotate([0, 180, 0]);
       r1.delete();
-      const wx = +box.length / 2 - box.wallThickness - label.x;
+      const wx = -box.length / 2 + box.wallThickness + label.x;
       const wz = box.floorThickness + label.y;
       const wy = isEmboss
         ? +box.width / 2 + label.depth / 2
@@ -494,11 +529,13 @@ export async function buildPositionedTextLabel(
     }
     case 'left': {
       // Outward = -X. -90 around Y then 90 around X.
+      // Position: 0,0 at interior bottom-left viewed from inside the box.
+      // For left wall, inside-view-left = box's -Y side (front).
       const r1 = slab.rotate([0, -90, 0]);
       slab.delete();
       const r2 = r1.rotate([90, 0, 0]);
       r1.delete();
-      const wy = +box.width / 2 - box.wallThickness - label.x;
+      const wy = -box.width / 2 + box.wallThickness + label.x;
       const wz = box.floorThickness + label.y;
       const wx = isEmboss
         ? -box.length / 2 - label.depth / 2
@@ -507,11 +544,13 @@ export async function buildPositionedTextLabel(
     }
     case 'right': {
       // Outward = +X. 90 around Y then 90 around X.
+      // Position: 0,0 at interior bottom-left viewed from inside the box.
+      // For right wall, inside-view-left = box's +Y side (back).
       const r1 = slab.rotate([0, 90, 0]);
       slab.delete();
       const r2 = r1.rotate([90, 0, 0]);
       r1.delete();
-      const wy = -box.width / 2 + box.wallThickness + label.x;
+      const wy = +box.width / 2 - box.wallThickness - label.x;
       const wz = box.floorThickness + label.y;
       const wx = isEmboss
         ? +box.length / 2 + label.depth / 2

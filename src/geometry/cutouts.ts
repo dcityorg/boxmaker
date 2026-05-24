@@ -90,13 +90,14 @@ async function buildOneCutout(
   // user-facing convention; the per-wall math is documented inline.)
   switch (c.surface) {
     case 'floor': {
-      // Floor 0,0 at the box's interior BACK-RIGHT corner (Fusion BoxMaker
-      // convention): "lower-left" when viewing the floor from a top view.
-      // User +X grows toward the world -X side; user +Y grows toward the
-      // world -Y side (front). Prism centered at the floor's mid-thickness
-      // so it pierces cleanly with a ~1mm overshoot on each face.
-      const wx = +box.length / 2 - box.wallThickness - c.x;
-      const wy = +box.width / 2 - box.wallThickness - c.y;
+      // Floor 0,0 at the box's interior FRONT-LEFT corner (Fusion BoxMaker
+      // convention): natural "lower-left when looking down at the box with
+      // the front edge near you" origin. User +X grows toward the right of
+      // the box (world +X); user +Y grows toward the back (world +Y).
+      // Prism centered at the floor's mid-thickness so it pierces cleanly
+      // with a ~1mm overshoot on each face.
+      const wx = -box.length / 2 + box.wallThickness + c.x;
+      const wy = -box.width / 2 + box.wallThickness + c.y;
       prism = prism.translate(wx, wy, box.floorThickness / 2);
       break;
     }
@@ -105,17 +106,16 @@ async function buildOneCutout(
       // above. Cutout pierces through the plate; center the prism on the
       // plate's mid-thickness so it bites symmetrically.
       //
-      // Lid coordinate frame (matches Fusion BoxMaker, intentionally
-      // different from the floor):
-      //   0,0 at the BACK-LEFT inner corner of the shoulder pocket. This is
-      //   "bottom-left" when you lie inside the box with your head against
-      //   the back wall and look up at the lid. User +X grows toward the
-      //   right (world +X, unchanged); user +Y grows toward the FRONT (world
-      //   -Y, opposite of the floor convention). The inner-radius on the
-      //   pocket corners is ignored -- 0,0 references the square corner.
+      // Lid coordinate frame: 0,0 at the FRONT-LEFT inner corner of the
+      // shoulder pocket as viewed from INSIDE the box (looking up at the
+      // lid's underside). Because the underside mirrors the top face,
+      // "inside-front-left" in world coords is the +X side at -Y (front).
+      // User +X grows toward the LEFT of the box (world -X); user +Y grows
+      // toward the BACK of the box (world +Y). The inner-radius on the
+      // pocket corners is ignored -- 0,0 references the square corner.
       const inset = box.wallThickness + lid.boxGap + lid.coverShoulderWallThickness;
-      const wx = -box.length / 2 + inset + c.x;
-      const wy = +box.width / 2 - inset - c.y;
+      const wx = +box.length / 2 - inset - c.x;
+      const wy = -box.width / 2 + inset + c.y;
       const plateMidZ = lid.coverShoulderDepth + lid.coverThicknessAtEdge / 2;
       prism = prism.translate(wx, wy, plateMidZ);
       break;
@@ -124,43 +124,51 @@ async function buildOneCutout(
       // Wall material at world Y in [-W/2, -W/2 + wallT]. Center the prism
       // INSIDE the wall (not on the outer face) so its short length covers
       // the wall material without overshooting to the opposite wall.
-      // u=+X, v=+Z (up), n=-Y. 90 deg around X sends [+X, +Y, +Z] -> [+X, +Z, -Y].
+      // 0,0 at the wall's interior bottom-left as viewed from INSIDE the box
+      // (Fusion BoxMaker convention). For the front wall, inside-view-left =
+      // box's +X side. User +X grows toward the box's -X side.
       prism = prism.rotate([90, 0, 0]);
-      const wx = -box.length / 2 + box.wallThickness + c.x;
+      const wx = +box.length / 2 - box.wallThickness - c.x;
       const wy = -box.width / 2 + box.wallThickness / 2;
       const wz = box.floorThickness + c.y;
       prism = prism.translate(wx, wy, wz);
       break;
     }
     case 'back': {
-      // Wall material at world Y in [+W/2 - wallT, +W/2]. u=-X, v=+Z, n=+Y.
-      // -90 around X then 180 around Y: -> [-X, +Z, +Y].
+      // Wall material at world Y in [+W/2 - wallT, +W/2].
+      // 0,0 at the wall's interior bottom-left as viewed from INSIDE the box.
+      // For the back wall, inside-view-left = box's -X side. User +X grows
+      // toward the box's +X side.
       prism = prism.rotate([-90, 0, 0]);
       prism = prism.rotate([0, 180, 0]);
-      const wx = box.length / 2 - box.wallThickness - c.x;
+      const wx = -box.length / 2 + box.wallThickness + c.x;
       const wy = box.width / 2 - box.wallThickness / 2;
       const wz = box.floorThickness + c.y;
       prism = prism.translate(wx, wy, wz);
       break;
     }
     case 'left': {
-      // Wall material at world X in [-L/2, -L/2 + wallT]. u=-Y, v=+Z, n=-X.
-      // -90 around Y then 90 around X: -> [-Y, +Z, -X].
+      // Wall material at world X in [-L/2, -L/2 + wallT].
+      // 0,0 at the wall's interior bottom-left as viewed from INSIDE the box.
+      // For the left wall, inside-view-left = box's -Y side (front). User +X
+      // grows toward the box's +Y side (back).
       prism = prism.rotate([0, -90, 0]);
       prism = prism.rotate([90, 0, 0]);
       const wx = -box.length / 2 + box.wallThickness / 2;
-      const wy = box.width / 2 - box.wallThickness - c.x;
+      const wy = -box.width / 2 + box.wallThickness + c.x;
       const wz = box.floorThickness + c.y;
       prism = prism.translate(wx, wy, wz);
       break;
     }
     case 'right': {
-      // Wall material at world X in [+L/2 - wallT, +L/2]. u=+Y, v=+Z, n=+X.
-      // 90 around Y then 90 around X: -> [+Y, +Z, +X].
+      // Wall material at world X in [+L/2 - wallT, +L/2].
+      // 0,0 at the wall's interior bottom-left as viewed from INSIDE the box.
+      // For the right wall, inside-view-left = box's +Y side (back). User +X
+      // grows toward the box's -Y side (front).
       prism = prism.rotate([0, 90, 0]);
       prism = prism.rotate([90, 0, 0]);
       const wx = box.length / 2 - box.wallThickness / 2;
-      const wy = -box.width / 2 + box.wallThickness + c.x;
+      const wy = box.width / 2 - box.wallThickness - c.x;
       const wz = box.floorThickness + c.y;
       prism = prism.translate(wx, wy, wz);
       break;

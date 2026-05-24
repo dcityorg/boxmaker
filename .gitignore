@@ -43,3 +43,6 @@ vasemaker-ui.md
 
 # local Claude settings / transcripts
 .claude/
+
+# working scratchpads
+instructions-text.md

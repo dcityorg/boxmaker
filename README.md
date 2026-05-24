@@ -51,6 +51,8 @@ for free-tier hosting -- no configuration needed beyond connecting the repo.
 
 ## User guide
 
-See [USER-GUIDE.md](USER-GUIDE.md) for the end-user reference: textarea
-syntax for standoffs / cutouts / text labels, coordinate frames per surface,
-font handling, persistence formats, export details, and FAQ.
+The full end-user reference -- textarea syntax for standoffs / cutouts /
+text labels, coordinate frames per surface, font handling, export details,
+3D-printing tips, and FAQ -- lives in the app itself. Click the **?**
+button in the sidebar header, or just open <https://boxmaker.dcity.org>
+and click **?** to read it without leaving your browser.

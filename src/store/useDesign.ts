@@ -1,6 +1,7 @@
 'use client';
 
 import { create } from 'zustand';
+import { listAvailableFonts } from '@/geometry/text';
 
 export type ViewMode = 'box' | 'lid' | 'assembled';
 export type DimensionMode = 'exterior' | 'interior';
@@ -191,7 +192,9 @@ function parseBool(s: string): boolean | null {
 
 /**
  * Parse a text-labels textarea. One label per line, comma-delimited.
- * Format (11 fields): Surface,Type,X,Y,Depth,TextHeight,Direction,Font,Bold,SeparateBody,Text
+ * Format (11 fields): Surface,X,Y,Type,Depth,TextHeight,Direction,Font,Bold,SeparateBody,Text
+ *
+ * Field order matches the Fusion 360 BoxMaker add-in.
  *
  * The Text field is taken as everything past the 10th comma, so commas
  * inside the text are preserved verbatim.
@@ -242,7 +245,7 @@ export function parseTextLabelsText(text: string): {
       continue;
     }
 
-    const [surfaceRaw, typeRaw, xRaw, yRaw, depthRaw, heightRaw, dirRaw, fontRaw, boldRaw, separateRaw] = head;
+    const [surfaceRaw, xRaw, yRaw, typeRaw, depthRaw, heightRaw, dirRaw, fontRaw, boldRaw, separateRaw] = head;
 
     const surface = surfaceRaw.toLowerCase();
     if (!CUTOUT_SURFACES.includes(surface as CutoutSurface)) {
@@ -283,9 +286,17 @@ export function parseTextLabelsText(text: string): {
       continue;
     }
 
-    const font = fontRaw; // free-form; geometry layer validates against loaded fonts
+    const font = fontRaw;
     if (!font) {
       errors.push({ line: i + 1, reason: 'font name is required' });
+      continue;
+    }
+    const available = listAvailableFonts();
+    if (!available.includes(font)) {
+      errors.push({
+        line: i + 1,
+        reason: `unknown font "${font}". Available: ${available.join(', ')}`,
+      });
       continue;
     }
 
@@ -461,6 +472,7 @@ export interface AppearanceSettings {
   boxColor: string;
   lidColor: string;
   showRulers: boolean;
+  showOrigins: boolean;
   view: ViewMode;
 }
 
@@ -505,9 +517,10 @@ export interface DesignState {
 }
 
 export const DEFAULT_APPEARANCE: AppearanceSettings = {
-  boxColor: '#3030ff',
-  lidColor: '#6d9fff',
+  boxColor: '#5050ff',
+  lidColor: '#6eb4ff',
   showRulers: false,
+  showOrigins: false,
   view: 'assembled',
 };
 
@@ -525,7 +538,7 @@ export const DEFAULT_BOX: BoxParams = {
 export const DEFAULT_LID: LidParams = {
   coverThicknessAtEdge: 2,
   coverThicknessAtCenter: 2,
-  coverShoulderWallThickness: 4,
+  coverShoulderWallThickness: 2,
   coverShoulderDepth: 3,
   boxGap: 0.2,
 };
@@ -539,8 +552,8 @@ export const DEFAULT_SNAP: SnapFitParams = {
   snapBack: true,
   snapLeft: true,
   snapRight: true,
-  nubHeight: 3,                 // mm — wall-side length; apex depth = 3/2 = 1.5
-  nubChamferAmountOnCover: 1.0, // mm — lid lead-in chamfer
+  nubHeight: 2,                 // mm — wall-side length; apex depth = 2/2 = 1.0
+  nubChamferAmountOnCover: 0.9, // mm — lid lead-in chamfer
   nubWidthRatio: 20,            // 20% of interior wall length
   nubWidthMin: 10,
   nubWidthMax: 30,
@@ -610,10 +623,13 @@ export const useDesign = create<DesignState>((set) => ({
     const textLabelsParse = parseTextLabelsText(design.textLabelsText);
     set({
       designName: design.designName,
-      appearance: { ...design.appearance },
-      box: { ...design.box },
-      lid: { ...design.lid },
-      snap: { ...design.snap },
+      // Merge with DEFAULT_APPEARANCE so older JSONs (saved before a field
+      // existed) pick up the new field's default instead of leaving it
+      // undefined. Same for box/lid/snap below.
+      appearance: { ...DEFAULT_APPEARANCE, ...design.appearance },
+      box: { ...DEFAULT_BOX, ...design.box },
+      lid: { ...DEFAULT_LID, ...design.lid },
+      snap: { ...DEFAULT_SNAP, ...design.snap },
       standoffsText: design.standoffsText,
       standoffs: standoffsParse.standoffs,
       standoffErrors: standoffsParse.errors,

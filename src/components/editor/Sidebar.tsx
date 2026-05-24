@@ -29,6 +29,7 @@ import {
   DesignFileError,
 } from '@/store/persistence';
 import * as opentype from 'opentype.js';
+import { idbSaveCustomFont, idbClearCustomFont } from '@/store/fontCache';
 import { manifoldToBinarySTL, downloadBinary } from '@/geometry/exportSTL';
 import { buildZip } from '@/geometry/zip';
 import { build3MF } from '@/geometry/export3MF';
@@ -129,6 +130,7 @@ export function Sidebar({ helpOpen, onToggleHelp, undo, redo, canUndo, canRedo }
       if (!ok) return;
     }
     clearCustomFonts();
+    void idbClearCustomFont();
     s.newDesign();
   }, []);
 
@@ -146,14 +148,17 @@ export function Sidebar({ helpOpen, onToggleHelp, undo, redo, canUndo, canRedo }
           const buf = base64ToBuffer(design.customFont.base64);
           const font = opentype.parse(buf);
           registerCustomFont(design.customFont.name, font, buf);
+          void idbSaveCustomFont(design.customFont.name, buf);
         } catch (err) {
           console.warn('[BoxMaker] embedded custom font failed to load:', err);
           // Continue loading the rest of the design; text labels referencing
           // the custom font will surface an "Unknown font" error in geometry.
           clearCustomFonts();
+          void idbClearCustomFont();
         }
       } else {
         clearCustomFonts();
+        void idbClearCustomFont();
       }
       useDesign.getState().loadDesign(design);
     } catch (err) {

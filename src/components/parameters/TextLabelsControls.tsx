@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as opentype from 'opentype.js';
 import { Section } from './ui';
 import { GROUP_COLORS } from '@/config/colors';
@@ -9,7 +9,10 @@ import {
   BUNDLED_FONT_NAMES,
   registerCustomFont,
   clearCustomFonts,
+  subscribeToCustomFont,
+  getActiveCustomFont,
 } from '@/geometry/text';
+import { idbSaveCustomFont, idbClearCustomFont } from '@/store/fontCache';
 
 export function TextLabelsControls() {
   const text = useDesign((s) => s.textLabelsText);
@@ -20,6 +23,15 @@ export function TextLabelsControls() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [customFontName, setCustomFontName] = useState<string | null>(null);
   const [customFontError, setCustomFontError] = useState<string | null>(null);
+
+  // Sync UI label with the active custom font. Picks up whatever is already
+  // active on mount (e.g., restored from IndexedDB by useAutoSave) and
+  // re-syncs on any subsequent register / clear.
+  useEffect(() => {
+    const sync = () => setCustomFontName(getActiveCustomFont()?.name ?? null);
+    sync();
+    return subscribeToCustomFont(sync);
+  }, []);
 
   const onPickFont = () => fileInputRef.current?.click();
 
@@ -36,6 +48,9 @@ export function TextLabelsControls() {
         font.names.fullName?.en ||
         file.name.replace(/\.(ttf|otf)$/i, '');
       registerCustomFont(family, font, buf);
+      // Persist to IndexedDB so the font survives reloads / tab closures.
+      // Fire-and-forget -- the cache module logs and swallows any error.
+      void idbSaveCustomFont(family, buf);
       setCustomFontName(family);
       // Nudge the geometry pipeline by re-applying the current text (forces
       // a parse + rebuild even though the text content is unchanged).
@@ -48,6 +63,7 @@ export function TextLabelsControls() {
 
   const onClearCustom = () => {
     clearCustomFonts();
+    void idbClearCustomFont();
     setCustomFontName(null);
     setCustomFontError(null);
     setText(text); // re-parse + rebuild so labels using the removed font show an error
@@ -61,18 +77,23 @@ export function TextLabelsControls() {
     >
       <div className="text-[10px] text-[var(--text-secondary)] italic mb-2 leading-snug">
         <div>
-          <code className="not-italic">
-            Surface,Type,X,Y,Depth,Height,Direction,Font,Bold,Separate,Text
+          Format: <code className="not-italic">
+            Surface,​X,​Y,​Type,​Depth,​Height,​Direction,​Font,​Bold,​SeparateBody,​Text
           </code>
         </div>
+        <div>Surface: front, back, left, right, floor, or lid</div>
+        <div>X,Y = center of text (mm) from 0,0 (see help)</div>
         <div>Type: emboss (raised) or deboss (recessed)</div>
+        <div>Depth: amount of emboss or deboss (mm)</div>
+        <div>Height: font size (mm)</div>
         <div>Direction: front, back, left, right, lid, floor</div>
-        <div>(text top points TOWARD that edge/face -- lid wall=lid means upright)</div>
-        <div>Bold / Separate: yes or no</div>
-        <div>Text: anything; commas inside the text are kept</div>
+        <div>(text top points TOWARD that surface)</div>
         <div>
-          Bundled fonts: <code className="not-italic">{BUNDLED_FONT_NAMES.join(', ')}</code>
+          Font: <code className="not-italic">{BUNDLED_FONT_NAMES.join(', ')}</code> (or your custom)
         </div>
+        <div>Bold: yes or no (if the font supports it)</div>
+        <div>SeparateBody: yes or no (yes if you plan to print the text in a separate color via the 3MF export)</div>
+        <div>Text: anything; commas inside the text are kept</div>
         <div>
           Use <code className="not-italic">{'//'}</code> for comments
         </div>
@@ -112,8 +133,8 @@ export function TextLabelsControls() {
         onChange={(e) => setText(e.target.value)}
         rows={10}
         spellCheck={false}
-        placeholder={'lid,deboss,50,35,0.6,5,front,Inter,no,no,Hello'}
-        title="One label per line: Surface,Type,X,Y,Depth,Height,Direction,Font,Bold,SeparateBody,Text -- // for comments. Commas inside Text are preserved."
+        placeholder={'lid,50,35,deboss,0.6,5,front,Open Sans,no,no,Hello'}
+        title="One label per line: Surface,X,Y,Type,Depth,Height,Direction,Font,Bold,SeparateBody,Text -- // for comments. Commas inside Text are preserved."
         className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded p-2 text-xs font-mono text-[var(--text-primary)] outline-none focus:border-[var(--accent)] resize-y"
       />
       <div className="text-[10px] text-[var(--text-secondary)] mt-1">

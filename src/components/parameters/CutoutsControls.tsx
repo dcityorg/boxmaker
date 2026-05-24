@@ -18,17 +18,16 @@ export function CutoutsControls() {
     >
       <div className="text-[10px] text-[var(--text-secondary)] italic mb-2 leading-snug">
         <div>
-          Round: <code className="not-italic">Surface,Round,X,Y,Diameter</code>
+          Format Round: <code className="not-italic">Surface,​Round,​X,​Y,​Diameter</code>
         </div>
         <div>
-          Rect: <code className="not-italic">Surface,Rect,X,Y,HoleX,HoleY,CornerRadius</code>
+          Format Rect: <code className="not-italic">Surface,​Rect,​X,​Y,​HoleX,​HoleY,​CornerRadius</code>
         </div>
         <div>Surface: front, back, left, right, floor, or lid</div>
-        <div>X,Y = center of cutout (mm) on the surface sketch.</div>
-        <div>Walls: 0,0 at interior bottom-left viewed from outside.</div>
-        <div>Floor: 0,0 at lower-left of top view (interior back-right).</div>
-        <div>Lid: 0,0 inside shoulder pocket at back-left; +Y grows to front.</div>
-        <div>HoleX, HoleY = rectangle width and height (Rect only)</div>
+        <div>X,Y = center of cutout (mm) from 0,0 (see help)</div>
+        <div>Diameter = circle diameter (mm) (Round only)</div>
+        <div>HoleX, HoleY = rectangle width and height (mm) (Rect only)</div>
+        <div>CornerRadius = radius of Rect corners (mm; 0 = square)</div>
         <div>
           Use <code className="not-italic">{'//'}</code> for comments
         </div>

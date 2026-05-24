@@ -19,6 +19,7 @@ export function SettingsControls() {
     appearance.boxColor === DEFAULT_APPEARANCE.boxColor &&
     appearance.lidColor === DEFAULT_APPEARANCE.lidColor &&
     appearance.showRulers === DEFAULT_APPEARANCE.showRulers &&
+    appearance.showOrigins === DEFAULT_APPEARANCE.showOrigins &&
     appearance.view === DEFAULT_APPEARANCE.view;
 
   return (
@@ -55,6 +56,12 @@ export function SettingsControls() {
         checked={appearance.showRulers}
         onChange={(v) => setAppearance({ showRulers: v })}
         tooltip="Show tick-marked X / Y / Z axis rulers in the viewport"
+      />
+      <Toggle
+        label="Show Origins"
+        checked={appearance.showOrigins}
+        onChange={(v) => setAppearance({ showOrigins: v })}
+        tooltip="Place a thin red cylinder NEAR each surface's (0, 0) corner -- offset 3 mm in each axis so it clears the inner corner radius. The cylinder runs perpendicular to the surface so it pokes through both faces of a wall -- visible from inside and outside the box."
       />
       <RadioRow
         label="View"

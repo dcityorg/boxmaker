@@ -18,13 +18,17 @@ export function StandoffsControls() {
     >
       <div className="text-[10px] text-[var(--text-secondary)] italic mb-2 leading-snug">
         <div>
-          Format: <code className="not-italic">Surface,X,Y,OD,Height,HoleDia,HoleDepth,BaseFillet</code>
+          Format: <code className="not-italic">Surface,​X,​Y,​OD,​Height,​HoleDia,​HoleDepth,​BaseFilletRadius</code>
         </div>
         <div>
           Surface: <code className="not-italic">floor</code> or <code className="not-italic">lid</code>
         </div>
-        <div>Floor: 0,0 at lower-left of top view (interior back-right)</div>
-        <div>Lid: 0,0 inside shoulder pocket at back-left; +Y to front</div>
+        <div>X,Y = center of standoff (mm) from 0,0 (see help)</div>
+        <div>OD = outside diameter of standoff (mm)</div>
+        <div>Height = height of standoff (mm)</div>
+        <div>HoleDia = hole diameter (mm)</div>
+        <div>HoleDepth = hole depth (mm)</div>
+        <div>BaseFilletRadius = fillet radius (mm)</div>
         <div>
           Use <code className="not-italic">{'//'}</code> for comments
         </div>
@@ -35,7 +39,7 @@ export function StandoffsControls() {
         rows={10}
         spellCheck={false}
         placeholder="floor,10,10,6,8,2.5,6,1"
-        title="One standoff per line: Surface,X,Y,OD,Height,HoleDia,HoleDepth,BaseFillet -- // for comments"
+        title="One standoff per line: Surface,X,Y,OD,Height,HoleDia,HoleDepth,BaseFilletRadius -- // for comments"
         className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded p-2 text-xs font-mono text-[var(--text-primary)] outline-none focus:border-[var(--accent)] resize-y"
       />
       <div className="text-[10px] text-[var(--text-secondary)] mt-1">

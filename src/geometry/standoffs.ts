@@ -60,25 +60,28 @@ async function buildStandoffHole(s: StandoffParams): Promise<Manifold | null> {
 }
 
 /**
- * Floor anchor (matches Fusion BoxMaker): 0,0 at the interior BACK-RIGHT
- * corner -- the "lower-left" of the top-down view convention. User +X grows
- * toward the world -X side; user +Y grows toward the world -Y side (front).
+ * Floor anchor (matches Fusion BoxMaker): 0,0 at the interior FRONT-LEFT
+ * corner -- the natural "lower-left when looking down at the box with the
+ * front edge near you" origin. User +X grows toward the right side of the
+ * box (world +X). User +Y grows toward the back of the box (world +Y).
  */
 function floorAnchorXY(box: BoxParams, x: number, y: number): { wx: number; wy: number } {
   return {
-    wx: +box.length / 2 - box.wallThickness - x,
-    wy: +box.width / 2 - box.wallThickness - y,
+    wx: -box.length / 2 + box.wallThickness + x,
+    wy: -box.width / 2 + box.wallThickness + y,
   };
 }
 
 /**
- * Lid anchor (matches Fusion BoxMaker): 0,0 at the BACK-LEFT inner corner
- * of the shoulder pocket -- the "bottom-left" when you lie inside the box
- * with your head against the back wall and look up at the lid.
+ * Lid anchor: 0,0 at the FRONT-LEFT inner corner of the shoulder pocket as
+ * viewed from INSIDE the box (i.e., looking up at the lid's underside).
+ * Because the underside is a mirror of the top face, "inside-front-left" in
+ * world coords is the +X side at -Y (front).
  *
- * +X grows toward the right (world +X, same as floor). +Y grows toward the
- * FRONT (world -Y, OPPOSITE of the floor). The inner-radius on the pocket
- * corners is ignored -- 0,0 references the square corner.
+ * +X grows toward the LEFT of the box (world -X) -- mirrored from the floor
+ * because the user is looking at the underside. +Y grows toward the BACK
+ * (world +Y). The inner-radius on the pocket corners is ignored -- 0,0
+ * references the square corner.
  */
 function lidAnchorXY(
   box: BoxParams,
@@ -88,8 +91,8 @@ function lidAnchorXY(
 ): { wx: number; wy: number } {
   const inset = box.wallThickness + lid.boxGap + lid.coverShoulderWallThickness;
   return {
-    wx: -box.length / 2 + inset + x,
-    wy: +box.width / 2 - inset - y,
+    wx: +box.length / 2 - inset - x,
+    wy: -box.width / 2 + inset + y,
   };
 }
 
