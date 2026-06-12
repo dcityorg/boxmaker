@@ -5,10 +5,9 @@ size a box and its lid, place standoffs and cutouts, add embossed or debossed
 text labels, then export STL or 3MF directly from your browser. No CAD install
 needed.
 
-Companion web app to the
-[BoxMaker Fusion 360 add-in](https://github.com/dcityorg/boxmaker-fusion).
-Parameter names and geometry semantics match between the two -- a box you size
-in one produces matching geometry in the other.
+![BoxMaker demo](./docs/images/hero.gif)
+
+Try it live: <https://boxmaker.dcity.org>
 
 ## Features
 
@@ -25,6 +24,23 @@ in one produces matching geometry in the other.
 - Undo / redo with rapid-write coalescing
 - Live 3D preview with orbit controls, six orthographic view shortcuts,
   ViewCube widget, and Blender-style numpad bindings (`1/3/7` etc.)
+
+## Example: Air Quality Monitor
+
+One of the built-in starter designs. Load it from the **Load Example...**
+dropdown in the sidebar, tweak it, and 3D-print the result. Click any image
+to see it full-size.
+
+<table>
+  <tr>
+    <td><a href="./docs/images/air-quality-monitor-printed-hero.jpg"><img src="./docs/images/air-quality-monitor-printed-hero.jpg" alt="Air Quality Monitor -- 3D printed, hero shot" width="400"></a></td>
+    <td><a href="./docs/images/air-quality-monitor-printed-front.jpg"><img src="./docs/images/air-quality-monitor-printed-front.jpg" alt="Air Quality Monitor -- 3D printed, front view" width="400"></a></td>
+  </tr>
+  <tr>
+    <td><a href="./docs/images/air-quality-monitor-rendered-angled.png"><img src="./docs/images/air-quality-monitor-rendered-angled.png" alt="Air Quality Monitor -- rendered in BoxMaker" width="400"></a></td>
+    <td><a href="./docs/images/air-quality-monitor-rendered-interior.png"><img src="./docs/images/air-quality-monitor-rendered-interior.png" alt="Air Quality Monitor -- interior view in BoxMaker" width="400"></a></td>
+  </tr>
+</table>
 
 ## Run locally
 

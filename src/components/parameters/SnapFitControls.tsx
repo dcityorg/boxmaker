@@ -57,10 +57,7 @@ export function SnapFitControls() {
     <Section
       title="Snap-Fit Clips"
       titleColor={GROUP_COLORS.box}
-      checked={anyEnabled}
-      onToggle={(v) =>
-        setSnap({ snapFront: v, snapBack: v, snapLeft: v, snapRight: v })
-      }
+      active={anyEnabled}
       tooltip="Triangular nubs on the box interior that engage matching cavities in the lid shoulder. Per-side toggles let you skip walls where another feature gets in the way."
     >
       <div className="grid grid-cols-2 gap-x-2">
@@ -113,7 +110,7 @@ export function SnapFitControls() {
         max={15}
         step={0.1}
         onChange={(v) => setSnap({ nubHeight: v })}
-        tooltip="Wall-side length of the right-isoceles cross-section (apex angle 90°). Shorter boxes typically need smaller nubs because the walls don't flex as much during insertion; taller boxes can take larger nubs. Apex depth = nubHeight/2 must stay within the lid shoulder wall thickness; nubHeight itself must stay within the lid shoulder depth -- otherwise the cavity in the lid breaks through. The sidebar shows a warning when either is violated."
+        tooltip="Wall-side length of the right-isoceles cross-section (apex angle 90°). Reference settings: smaller boxes (under ~60 mm) work well at 2.4 mm with 2 nubs (e.g. Front + Back); larger boxes (~80 mm and up) work well at 4 mm with all 4 nubs. Some tuning may be needed for your design. Apex depth = nubHeight/2 must stay within the lid shoulder wall thickness; nubHeight itself must stay within the lid shoulder depth -- otherwise the cavity in the lid breaks through (the sidebar warns when either is violated)."
       />
       <NumberInput
         label="Lid lead-in"

@@ -28,7 +28,7 @@ const HELP_SECTIONS: HelpSection[] = [
       {
         type: 'paragraph',
         text:
-          'BoxMaker is a parametric 3D-printable enclosure generator. Adjust sliders or type values in the sidebar and the 3D preview updates instantly. When you are happy, export an STL zip or a single 3MF for multi-material printing.',
+          'BoxMaker is a parametric 3D-printable enclosure generator. Adjust sliders or type values in the sidebar and the 3D preview updates instantly. When you are happy, export an STL zip or a single 3MF for multi-material printing (e.g. for different colored text).',
       },
       { type: 'heading', text: 'Basic workflow' },
       {
@@ -45,7 +45,12 @@ const HELP_SECTIONS: HelpSection[] = [
       {
         type: 'tip',
         text:
-          'Use the View radio in Settings to switch between `box`, `lid`, and `assembled` views to check fit before exporting.',
+          'Hold `Shift` while adjusting any slider for 10x larger steps, or `Alt` for 10x finer steps. Works with both dragging and arrow keys.',
+      },
+      {
+        type: 'tip',
+        text:
+          'Use the View radio in Settings to show just the `box`, just the `lid`, or the `assembled` view.',
       },
     ],
   },
@@ -97,12 +102,23 @@ const HELP_SECTIONS: HelpSection[] = [
       },
       { type: 'heading', text: 'Dimension fields' },
       {
+        type: 'paragraph',
+        text:
+          'Each slider has a `step` that defines its natural increment (1 mm for box L/W/H, 0.1 mm for most others). The same modifier scheme applies to every input method:',
+      },
+      {
         type: 'list',
         items: [
-          'Type a value and press Enter',
-          'Arrow up / down -- step by the field\'s step (typically 0.1 mm)',
-          'Shift + arrow -- step by 10 x the field\'s step',
-          'Drag the slider for coarse exploration',
+          '`Shift` = 10 x step (coarse)',
+          '`Alt` = 0.1 x step (fine; wins if both held)',
+        ],
+      },
+      {
+        type: 'list',
+        items: [
+          'Type a value into the text field and press `Enter` (or `Esc` to revert)',
+          'Arrow keys on the text field or slider -- nudge by step (slider also accepts Left / Right)',
+          'Drag the slider -- relative scrub from the current value, 1 px = step',
         ],
       },
     ],
@@ -133,7 +149,7 @@ const HELP_SECTIONS: HelpSection[] = [
       {
         type: 'paragraph',
         text:
-          '`Edge thick` controls the rim around the lid; `Center thick` is independent so you can pocket the middle for weight or cost without thinning the rim. The pocket cuts upward from the underside; if `Center thick` equals `Edge thick` the pocket disappears.',
+          '`Edge thick` controls the rim around the lid; `Center thick` is independent so you can pocket the middle for weight or cost without thinning the rim. The pocket cuts upward from the underside.',
       },
       { type: 'heading', text: 'Lid shoulder' },
       {
@@ -155,7 +171,7 @@ const HELP_SECTIONS: HelpSection[] = [
       {
         type: 'paragraph',
         text:
-          'Triangular nubs on the box interior engage matching cavities cut into the lid shoulder. The cross-section is a right-isoceles triangle (apex angle 90 degrees); apex depth equals `nubHeight / 2`. This is the print-tested geometry from the Fusion BoxMaker -- it clicks satisfyingly and survives many engagement cycles.',
+          'Triangular nubs on the box interior engage matching cavities cut into the lid shoulder. The cross-section is a right-isoceles triangle (apex angle 90 degrees); apex depth equals `nubHeight / 2`. This is print-tested geometry -- it clicks satisfyingly and survives many engagement cycles.',
       },
       { type: 'heading', text: 'Per-side toggles' },
       {
@@ -184,21 +200,34 @@ const HELP_SECTIONS: HelpSection[] = [
       {
         type: 'list',
         items: [
-          '`Nub height / 2` must not exceed `Lid shoulder wall`. The cavity opens on the outer face of the shoulder (so the nub can enter) and its apex extends inward through the shoulder material. If the apex is deeper than the shoulder is thick, the cavity pokes through to the inner face of the shoulder (the side facing into the pocket).',
+          '`Nub height / 2` must not exceed `Lid shoulder wall thickness`. The cavity opens on the outer face of the shoulder (so the nub can enter) and its apex extends inward through the shoulder material. If the apex is deeper than the shoulder is thick, the cavity pokes through to the inner face of the shoulder (the side facing into the pocket).',
           '`Nub height` must not exceed `Lid shoulder depth`. The cavity has the same vertical span as the nub; if the nub is taller than the shoulder, the cavity extends past the shoulder bottom and the nub can\'t seat.',
           '`Nub height` below 2 mm tends to print poorly -- the small triangular ridge under-extrudes or loses definition on typical FDM printers.',
           '`Nub height` above 5 mm makes the lid hard to seat -- walls don\'t flex enough to pass that much apex during insertion.',
         ],
       },
+      { type: 'heading', text: 'Reference settings' },
       {
         type: 'paragraph',
         text:
-          'Box size also matters: shorter boxes typically need smaller nubs (walls don\'t flex as much during insertion); taller boxes can take larger nubs. The 2-5 mm range is the practical sweet spot for typical box sizes.',
+          'Two configurations have been print-tested as good starting points:',
+      },
+      {
+        type: 'list',
+        items: [
+          'Smaller boxes (under ~60 mm in length / width): `Nub height` of 2.4 mm with **2 nubs** (typically Front + Back, or Left + Right). The smaller nub seats more easily on stiffer short walls.',
+          'Larger boxes (~80 mm and up): `Nub height` of 4.0 mm with **4 nubs** (all sides enabled). Larger walls flex more during insertion, so taller nubs are needed for a satisfying click.',
+        ],
+      },
+      {
+        type: 'paragraph',
+        text:
+          'These are starting points, not rules. Wall thickness, lid shoulder dimensions, filament stiffness, and print quality all affect how the snap feels. Print a test lid, adjust `Nub height` (and `Lid lead-in` for engagement ease) as needed, and re-print just the lid to iterate cheaply.',
       },
       {
         type: 'tip',
         text:
-          'Lid pops off too easily -> increase `Lid lead-in` (try 1.2 or 1.5). Lid won\'t close -> decrease `Lid lead-in` (try 0.6 or 0.8). For prints with significant elephant-foot, also bump `Box gap` up by 0.1 mm.',
+          'Lid pops off too easily -> increase `Nub height` by 0.5 mm (you may also need to increase `Shoulder depth` if it is not tall enough). Lid won\'t close -> decrease `Nub height` by 0.5 mm.',
       },
     ],
   },
@@ -358,7 +387,7 @@ back,40,20,deboss,0.4,4,lid,Open Sans,no,no,SN-001
 lid,44,15,emboss,0.6,4,back,JetBrains Mono,no,yes,v1.0
 
 // Floor -- maker's mark (auto-mirrored)
-floor,48,33,deboss,0.4,4,back,Open Sans,no,no,Made by Gary`,
+floor,48,33,deboss,0.4,4,back,Open Sans,no,no,BoxMaker`,
       },
     ],
   },
@@ -392,10 +421,10 @@ floor,48,33,deboss,0.4,4,back,Open Sans,no,no,Made by Gary`,
       {
         type: 'list',
         items: [
-          '**Front** wall: viewed from inside, your right is toward the box\'s LEFT side; user `+X` runs toward box `-X`.',
-          '**Back** wall: viewed from inside, your right is toward the box\'s RIGHT side; user `+X` runs toward box `+X`.',
-          '**Left** wall: viewed from inside, your right is toward the box\'s BACK; user `+X` runs toward box `+Y`.',
-          '**Right** wall: viewed from inside, your right is toward the box\'s FRONT; user `+X` runs toward box `-Y`.',
+          '**Front** wall: viewed from inside, your right is toward the box\'s LEFT side, so the wall\'s `+X` points along world `-X`.',
+          '**Back** wall: viewed from inside, your right is toward the box\'s RIGHT side, so the wall\'s `+X` points along world `+X`.',
+          '**Left** wall: viewed from inside, your right is toward the box\'s BACK, so the wall\'s `+X` points along world `+Y`.',
+          '**Right** wall: viewed from inside, your right is toward the box\'s FRONT, so the wall\'s `+X` points along world `-Y`.',
         ],
       },
       {
@@ -449,7 +478,7 @@ floor,48,33,deboss,0.4,4,back,Open Sans,no,no,Made by Gary`,
       {
         type: 'tip',
         text:
-          'Print a test before committing to large embossed / debossed text. Thin font strokes (< 0.4 mm at scale) don\'t survive a 0.4 mm nozzle and look ragged or just disappear.',
+          'Print a test before committing to large embossed / debossed text. Thin font strokes (< 0.4 mm at scale) don\'t survive a 0.4 mm nozzle and look ragged or just disappear. If you need crisper text, switch to a 0.2 mm nozzle -- the finer extrusion width resolves thinner strokes and gives much cleaner lettering.',
       },
     ],
   },
@@ -472,7 +501,7 @@ floor,48,33,deboss,0.4,4,back,Open Sans,no,no,Made by Gary`,
       {
         type: 'paragraph',
         text:
-          'Both STL and 3MF emit the lid in print orientation: plate-top resting on the build plate, shoulder pointing up. Deboss recesses are on the build plate, so any colored `SeparateBody` text prints as the bottom layers (= the visible colored layer when you peel the print off). After printing, flip the lid to assemble onto the box. The 3MF additionally offsets the lid in +X so it sits beside the box on the build plate.',
+          'Both STL and 3MF emit the lid in print orientation: plate-top resting on the build plate, shoulder pointing up. Deboss recesses are on the build plate, so any colored `SeparateBody` text prints as the bottom layers (= the visible colored layer when you peel the print off). The 3MF additionally offsets the lid in +X so it sits beside the box on the build plate.',
       },
       { type: 'heading', text: 'Save Design' },
       {
@@ -490,7 +519,7 @@ floor,48,33,deboss,0.4,4,back,Open Sans,no,no,Made by Gary`,
       {
         type: 'paragraph',
         text:
-          'Every edit debounce-writes to `localStorage` 500 ms after you stop typing -- a page reload picks back up where you left off. If you open a Share Link URL, that design loads instead of the `localStorage` copy; the hash is cleared after load.',
+          'Your design saves automatically to your browser (`localStorage`) about half a second after you stop making changes, so reloading the page picks up right where you left off. If you open a Share Link URL, that design loads instead of the `localStorage` copy; the hash is cleared after load.',
       },
       { type: 'heading', text: 'Custom font persistence' },
       {
@@ -514,22 +543,32 @@ floor,48,33,deboss,0.4,4,back,Open Sans,no,no,Made by Gary`,
       {
         type: 'list',
         items: [
-          'Default `Lid lead-in` of 0.9 mm works for typical PETG/PLA on a well-tuned printer',
-          'Lid won\'t close: decrease `Lid lead-in` (try 0.6 or 0.8)',
-          'Lid pops off too easily: increase `Lid lead-in` (try 1.2 or 1.5)',
+          'Default `Nub height` of 2 mm works for typical PETG/PLA on a well-tuned printer',
+          'Lid won\'t close: decrease `Nub height` by 0.5 mm',
+          'Lid pops off too easily: increase `Nub height` by 0.5 mm (you may also need to increase `Shoulder depth` if it is not tall enough)',
           'Walls too thin to engage cleanly: increase `Shoulder wall` (lid) or `Wall` (box) thickness',
-          'Significant elephant-foot on the first layer: increase `Box gap` by 0.1 mm so the lid still seats',
         ],
       },
       { type: 'heading', text: 'Multi-material setup (Bambu Studio)' },
       {
         type: 'list',
         items: [
-          'Export 3MF and drag it into Bambu Studio',
-          'The box and lid appear in the Objects panel as separate items',
-          'For a lid with `SeparateBody` text, the text body shows up as `<name>-lid-text`',
-          'Assign filament 1 to the lid body and filament 2 to the text body',
-          'The colored filament prints in the deboss recesses as the bottom layers; the body fills above',
+          'Export a 3MF and drag it into Bambu Studio.',
+          'Click OK on the "The 3mf is not from Bambu Lab..." message.',
+          'Click No on the "This file contains several objects..." message.',
+          'The objects appear on the build plate.',
+          'Under Process, select the Objects tab.',
+          'The box and lid show up in the Objects panel as separate items.',
+          'For a lid with `SeparateBody` text, the text body appears as `<name>-lid-text`.',
+          'Assign your printer\'s colors to each object by clicking the colored swatches.',
+          'For a lid with `SeparateBody` text, give the lid-text a different color from the lid.',
+          'Select the lid and lid-text rows in the Objects panel, right-click, and choose Merge -- now the lid and its text move together.',
+          'Arrange the pieces on the build plate as you like (or right-click and choose Arrange).',
+          'A tall 2-color prime tower also appears; it shrinks once filament grouping is set (below).',
+          'Click Preview to slice. Click Sync Now if your colors are not already synced.',
+          'If you have a dual-nozzle printer, a Filament Grouping dialog appears -- choose "Regroup filament", then "Custom" to set the nozzle options.',
+          'The prime tower should now be very short -- just the lid and lid-text colors.',
+          'Click Print plate to finalize the print.',
         ],
       },
       {
@@ -547,7 +586,7 @@ floor,48,33,deboss,0.4,4,back,Open Sans,no,no,Made by Gary`,
       {
         type: 'paragraph',
         text:
-          'Textareas are denser (you can see your entire feature list at a glance), faster to bulk-edit (paste 20 standoffs from a spreadsheet), and trivially copy-paste-shareable. The project initially planned a list-of-cards UI; we switched to textareas after trying both. The Fusion 360 BoxMaker add-in uses the same pattern.',
+          'Textareas are denser (you can see your entire feature list at a glance), faster to bulk-edit (paste 20 standoffs from a spreadsheet), and trivially copy-paste-shareable. The project initially planned a list-of-cards UI; we switched to textareas after trying both.',
       },
       { type: 'heading', text: 'Can I bulk-edit by pasting from a spreadsheet?' },
       {
@@ -603,7 +642,7 @@ floor,48,33,deboss,0.4,4,back,Open Sans,no,no,Made by Gary`,
  * help authors mix code-ish identifiers into prose without escaping JSX.
  */
 function renderInline(text: string): React.ReactNode[] {
-  return text.split(/(`[^`]+`)/g).map((part, i) => {
+  return text.split(/(`[^`]+`|\*\*[^*]+\*\*)/g).map((part, i) => {
     if (part.startsWith('`') && part.endsWith('`')) {
       return (
         <code
@@ -612,6 +651,13 @@ function renderInline(text: string): React.ReactNode[] {
         >
           {part.slice(1, -1)}
         </code>
+      );
+    }
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return (
+        <strong key={i} className="font-semibold text-[var(--text-primary)]">
+          {part.slice(2, -2)}
+        </strong>
       );
     }
     return part;

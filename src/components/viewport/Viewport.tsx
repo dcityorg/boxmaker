@@ -292,6 +292,7 @@ export function Viewport() {
           makeDefault
           enableDamping
           dampingFactor={0.1}
+          zoomSpeed={0.5}
           target={target}
           minDistance={10}
           maxDistance={5000}

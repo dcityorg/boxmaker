@@ -70,7 +70,7 @@ export function BoxControls() {
           value={shown.length}
           min={10}
           max={500}
-          step={0.1}
+          step={1}
           onChange={writeShownLength}
           tooltip={`Box ${box.mode} length along the X axis`}
         />
@@ -79,7 +79,7 @@ export function BoxControls() {
           value={shown.width}
           min={10}
           max={500}
-          step={0.1}
+          step={1}
           onChange={writeShownWidth}
           tooltip={`Box ${box.mode} width along the Y axis`}
         />
@@ -88,7 +88,7 @@ export function BoxControls() {
           value={shown.height}
           min={5}
           max={300}
-          step={0.1}
+          step={1}
           onChange={writeShownHeight}
           tooltip={`Box ${box.mode} height along the Z axis`}
         />

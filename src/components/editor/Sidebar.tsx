@@ -1,10 +1,12 @@
 'use client';
 
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 import { UI_MUTED, GROUP_COLORS } from '@/config/colors';
 import { APP_VERSION } from '@/config/version';
 import { useDesign } from '@/store/useDesign';
 import { GroupHeader } from '@/components/parameters/ui';
+import { PresetPicker } from '@/components/editor/PresetPicker';
+import type { Preset } from '@/data/presets';
 import { SettingsControls } from '@/components/parameters/SettingsControls';
 import { BoxControls } from '@/components/parameters/BoxControls';
 import { LidControls } from '@/components/parameters/LidControls';
@@ -53,6 +55,20 @@ export function Sidebar({ helpOpen, onToggleHelp, undo, redo, canUndo, canRedo }
   const designLoadInputRef = useRef<HTMLInputElement>(null);
   const [editingName, setEditingName] = useState(false);
   const [exporting, setExporting] = useState(false);
+
+  // Unsaved-changes modal: holds the action to run after the user decides
+  // (Save & Continue, Don't Save, or Cancel). Open when non-null.
+  const [pendingAction, setPendingAction] = useState<(() => void | Promise<void>) | null>(null);
+
+  // Funnel for actions (New, Load) that would discard unsaved work. If clean,
+  // run immediately; if dirty, stash and open the modal.
+  const runWithDirtyGuard = useCallback((action: () => void | Promise<void>) => {
+    if (useDesign.getState().isDirty) {
+      setPendingAction(() => action);
+    } else {
+      void action();
+    }
+  }, []);
 
   const handleToggleAll = useCallback(() => {
     const container = scrollRef.current;
@@ -122,24 +138,47 @@ export function Sidebar({ helpOpen, onToggleHelp, undo, redo, canUndo, canRedo }
   }, []);
 
   const handleNewDesign = useCallback(() => {
-    const s = useDesign.getState();
-    if (s.isDirty) {
-      const ok = window.confirm(
-        'You have unsaved changes. Discard them and start a new design?'
-      );
-      if (!ok) return;
+    runWithDirtyGuard(() => {
+      clearCustomFonts();
+      void idbClearCustomFont();
+      useDesign.getState().newDesign();
+    });
+  }, [runWithDirtyGuard]);
+
+  const handleModalSaveAndContinue = useCallback(() => {
+    handleSaveDesign();
+    // handleSaveDesign marks the store clean on success, or alerts and stays
+    // dirty on failure. If it's still dirty, the save failed -- don't run the
+    // pending action (don't silently discard the user's work).
+    if (!useDesign.getState().isDirty && pendingAction) {
+      void pendingAction();
     }
-    clearCustomFonts();
-    void idbClearCustomFont();
-    s.newDesign();
-  }, []);
+    setPendingAction(null);
+  }, [handleSaveDesign, pendingAction]);
+
+  const handleModalDiscard = useCallback(() => {
+    if (pendingAction) void pendingAction();
+    setPendingAction(null);
+  }, [pendingAction]);
+
+  const handleModalCancel = useCallback(() => setPendingAction(null), []);
+
+  // Escape closes the modal (matches the same behavior as the Cancel button).
+  useEffect(() => {
+    if (!pendingAction) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setPendingAction(null);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [pendingAction]);
 
   const handleLoadDesignClick = () => designLoadInputRef.current?.click();
 
-  const handleLoadDesignFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
+  const doLoadDesignFile = async (file: File) => {
     try {
       const text = await file.text();
       const design = parseDesignFile(text);
@@ -166,6 +205,32 @@ export function Sidebar({ helpOpen, onToggleHelp, undo, redo, canUndo, canRedo }
       console.error('[BoxMaker] load design failed:', err);
       alert(`Load Design failed: ${msg}`);
     }
+  };
+
+  const handleLoadDesignFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    runWithDirtyGuard(() => doLoadDesignFile(file));
+  };
+
+  const doLoadPreset = (preset: Preset) => {
+    try {
+      const design = parseDesignFile(preset.json);
+      // Presets never carry a custom font, so just clear any user font
+      // that was active before loading.
+      clearCustomFonts();
+      void idbClearCustomFont();
+      useDesign.getState().loadDesign(design);
+    } catch (err) {
+      const msg = err instanceof DesignFileError ? err.message : (err as Error).message;
+      console.error('[BoxMaker] load preset failed:', err);
+      alert(`Load Example failed: ${msg}`);
+    }
+  };
+
+  const handleSelectPreset = (preset: Preset) => {
+    runWithDirtyGuard(() => doLoadPreset(preset));
   };
 
   const handleExport3MF = async () => {
@@ -254,6 +319,7 @@ export function Sidebar({ helpOpen, onToggleHelp, undo, redo, canUndo, canRedo }
   };
 
   return (
+    <>
     <div className="w-80 h-full bg-[var(--bg-panel)] border-r border-[var(--border-color)] flex flex-col shrink-0">
       {/* Header */}
       <div className="px-4 py-3 border-b border-[var(--border-color)]">
@@ -343,6 +409,7 @@ export function Sidebar({ helpOpen, onToggleHelp, undo, redo, canUndo, canRedo }
       <div ref={scrollRef} className="flex-1 overflow-y-auto sidebar-scroll">
         {/* Toolbar */}
         <div className="px-3 py-2 border-b border-[var(--border-color)] flex flex-col gap-2">
+          <PresetPicker onSelect={handleSelectPreset} />
           <div className="flex gap-2">
             <button
               onClick={handleNewDesign}
@@ -428,5 +495,42 @@ export function Sidebar({ helpOpen, onToggleHelp, undo, redo, canUndo, canRedo }
         </div>
       </div>
     </div>
+
+    {pendingAction && (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+        onClick={handleModalCancel}
+      >
+        <div
+          className="bg-[var(--bg-panel)] border border-[var(--border-color)] rounded-lg p-5 max-w-sm mx-4 shadow-xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <p className="text-sm text-[var(--text-primary)] mb-4">
+            You have unsaved changes. Save first?
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={handleModalSaveAndContinue}
+              className="flex-1 px-3 py-1.5 text-xs bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded font-medium transition-colors"
+            >
+              Save &amp; Continue
+            </button>
+            <button
+              onClick={handleModalDiscard}
+              className="flex-1 px-3 py-1.5 text-xs bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded hover:bg-[var(--border-color)] text-[var(--text-primary)] transition-colors"
+            >
+              Don&apos;t Save
+            </button>
+            <button
+              onClick={handleModalCancel}
+              className="flex-1 px-3 py-1.5 text-xs bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded hover:bg-[var(--border-color)] text-[var(--text-secondary)] transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }

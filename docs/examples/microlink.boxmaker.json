@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "designName": "MicroLink",
+  "appearance": {
+    "boxColor": "#5050ff",
+    "lidColor": "#6eb4ff",
+    "showRulers": false,
+    "view": "assembled"
+  },
+  "box": {
+    "mode": "exterior",
+    "length": 50,
+    "width": 35,
+    "height": 20,
+    "wallThickness": 2,
+    "floorThickness": 2,
+    "outerCornerRadius": 2,
+    "innerCornerRadius": 2
+  },
+  "lid": {
+    "coverThicknessAtEdge": 2,
+    "coverThicknessAtCenter": 2,
+    "coverShoulderWallThickness": 2,
+    "coverShoulderDepth": 3,
+    "boxGap": 0.2
+  },
+  "snap": {
+    "snapFront": true,
+    "snapBack": true,
+    "snapLeft": false,
+    "snapRight": false,
+    "nubHeight": 2.4000000000000004,
+    "nubChamferAmountOnCover": 0.9,
+    "nubWidthRatio": 20,
+    "nubWidthMin": 10,
+    "nubWidthMax": 30,
+    "nubBoxShrink": 2
+  },
+  "standoffsText": "// PCB mounting at four corners — M2, 4mm tall, with screw hole through to floor\nfloor,3,3,4,4,2,5,1\nfloor,43,3,4,4,2,5,1\nfloor,43,28,4,4,2,5,1\nfloor,3,28,4,4,2,5,1",
+  "cutoutsText": "// USB-C in (back wall, centered horizontally, 5mm above floor interior)\nback,Rect,23,5,9,3.3,1\n// USB-C out (front wall, same position)\nfront,Rect,23,5,9,3.3,1\n// LED indicator on front wall, upper-left\nfront,Round,8,5,3",
+  "textLabelsText": "// Small product name debossed on the lid\nlid,20,13,deboss,0.6,4,Back,Open Sans,yes,no,MicroLink"
+}

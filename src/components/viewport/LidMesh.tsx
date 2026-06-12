@@ -97,7 +97,8 @@ export function LidMesh() {
     <group position={[0, 0, zOffset]}>
       <mesh geometry={geometry} castShadow receiveShadow>
         <meshStandardMaterial color={color} roughness={0.4} metalness={0.05} flatShading />
-        <Edges threshold={20} color="#1f1f1f" />
+        {/* key forces remount when geometry changes -- see BoxMesh.tsx note */}
+        <Edges key={geometry.uuid} threshold={20} color="#1f1f1f" />
       </mesh>
       {textGeometry && (
         <mesh geometry={textGeometry} castShadow receiveShadow>

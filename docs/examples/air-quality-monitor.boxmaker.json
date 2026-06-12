@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "designName": "BoxMaker AQM",
+  "appearance": {
+    "boxColor": "#5050ff",
+    "lidColor": "#6eb4ff",
+    "showRulers": false,
+    "view": "assembled"
+  },
+  "box": {
+    "mode": "exterior",
+    "length": 125,
+    "width": 82,
+    "height": 76,
+    "wallThickness": 2.5,
+    "floorThickness": 2.5,
+    "outerCornerRadius": 2,
+    "innerCornerRadius": 2
+  },
+  "lid": {
+    "coverThicknessAtEdge": 2,
+    "coverThicknessAtCenter": 2.8000000000000003,
+    "coverShoulderWallThickness": 2.5,
+    "coverShoulderDepth": 4,
+    "boxGap": 0.2
+  },
+  "snap": {
+    "snapFront": true,
+    "snapBack": true,
+    "snapLeft": true,
+    "snapRight": true,
+    "nubHeight": 4,
+    "nubChamferAmountOnCover": 0.9,
+    "nubWidthRatio": 20,
+    "nubWidthMin": 10,
+    "nubWidthMax": 30,
+    "nubBoxShrink": 2
+  },
+  "standoffsText": "//Standoffs\n// micro board\nfloor,10.1,47.6,5,8,2.6,7,3\nfloor,59,47.6,5,8,2.6,7,3\nfloor,59,34.9,5,8,2.6,7,3\nfloor,10.1,34.9,5,8,2.6,7,3\n// air qual sensor\nfloor,86.1,50.8,5,8,2.6,7,2\nfloor,116.5,50.8,5,8,2.6,7,1\nfloor,116.5,5,5,8,2.6,7,1\nfloor,86.1,5,5,8,2.6,7,2\n// sensor\nlid,9.3,27.5,5,3.9,2.2,4.2,3\nlid,29.9,27.5,5,3.9,2.2,4.2,3\nlid,29.9,7.2,5,3.9,2.2,4.2,3\nlid,9.3,7.2,5,3.9,2.2,4.2,3\n// oled\nlid, 10.1, 63.1, 4, 2.6, 2.2, 3.2, 2\nlid, 101.7, 63.1, 4, 2.6, 2.2, 3.2, 1.5\nlid, 101.7, 38, 4, 2.6, 2.2, 3.2, 1.5\nlid, 10.1, 38, 4, 2.6, 2.2, 3.2, 2",
+  "cutoutsText": "// Cutouts\n// lid sensor\nlid, Rect, 19.6, 17.7, 10, 10, 0\n// lid oled\nlid, Rect,58.1,49,79.6,26.9,0\n// right air qual sensor\nright, Rect, 55.5,19.5,32,8,0\n// left reset button\nleft,Round,61,54,5.5\n// left power hole\nleft,Rect,40.4,23.85,16.8,12.7,0",
+  "textLabelsText": "//Labels\n// Lid\nlid,82,68.5,deboss,0.5,5,back,Open Sans,yes,yes,Air Quality Monitor\n\n// Left Side\nleft,54,23.85,deboss,0.5,4,back,Open Sans,yes,no,Power\n\nleft,69.5,54, deboss,0.5,4,back,Open Sans,yes,no,Reset"
+}
