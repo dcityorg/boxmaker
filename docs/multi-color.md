@@ -100,8 +100,6 @@ Click **Export 3MF** in the sidebar toolbar. BoxMaker downloads a single `.3mf` 
 
 The 3MF declares units explicitly as millimeters and embeds no color metadata, so Bambu Studio's importer should have minimal surprises (see the next section).
 
-![BoxMaker sidebar with Export 3MF button highlighted](images/web-export-3mf-button.png)
-
 ## Setting up the X2D and Bambu Studio
 
 Do this once, before you import your part:
@@ -132,19 +130,9 @@ You'll see one prompt (and possibly two defensive ones).
 
 Click **OK**. This is normal -- the 3MF wasn't authored by Bambu Studio.
 
-### "Standard 3mf Import color." -- if it appears
+### "This file contains several objects..." -- if it appears
 
-BoxMaker's 3MF does NOT embed object colors, so this dialog should not normally appear. **If it does appear** for some reason (e.g. a future Bambu Studio version is over-eager), click **OK** without changing the **Matching** column. Do not bind imported colors onto your existing filaments using this dialog -- there's a known issue where doing so can leave Bambu Studio in an inconsistent state that silently breaks dual-nozzle filament assignment later.
-
-If you do see this dialog and accept its defaults, Bambu Studio will append one or two new filament slots to your Project Filaments. Delete those appended slots before doing anything else (Project Filaments -> `...` menu next to each appended slot -> Delete).
-
-![Standard 3mf Import color dialog -- click OK without changing the Matching column](images/bs-import-color.png)
-
-### "Object too small, may be in meters or inches. Scale to millimeters?" -- if it appears
-
-BoxMaker exports proper millimeter metadata, so this prompt should not normally appear. **If it does appear** (small boxes can occasionally trigger Bambu Studio's "too small" heuristic), click **No**. Clicking Yes would scale by 1000 (assuming meters) or 25.4 (assuming inches) and your box would import absurdly large.
-
-![Bambu Studio "Object too small" prompt -- click No](images/bs-object-too-small.png)
+Click **No**. You want the lid and box to be considered as multiple objects. 
 
 ## Assigning filaments and merging
 
@@ -156,23 +144,26 @@ Your part is now on the plate. In the **Objects** panel (Prepare tab -> Process 
 ### 1. Assign filaments
 
 1. Click the **body object** (e.g. `MyDesign-lid`) in the Objects panel. Click its filament-color box and assign your body filament (e.g. slot **2**, AMS, black).
-2. Click the **text object** (e.g. `MyDesign-lid-text`). Click its filament-color box and assign your text filament (e.g. slot **5**, External holder, white).
+2. Click the **body object** (e.g. `MyDesign-box`) in the Objects panel. Click its filament-color box and assign your body filament (e.g. slot **2**, AMS, black).
+3. Click the **text object** (e.g. `MyDesign-lid-text`). Click its filament-color box and assign your text filament (e.g. slot **5**, External holder, white).
 
-In our example: lid uses filament **2** (black, from AMS), text uses filament **5** (white, from External holder).
+In our example: box and lid uses filament **1** (Red, from AMS), text uses filament **2** (yellow, from AMS).
 
 ### 2. Merge the body and the text into one assembly
 
-The text body physically sits inside the lid's volume (that's how a deboss works). As independent objects on the plate, the slicer treats the overlap as a collision and throws a "Conflicts of gcode paths at layer 1" warning. Merging them into a single assembly tells the slicer the overlap is intentional.
-
-1. Click the body object (e.g. `MyDesign-lid`) in the Objects list.
-2. Cmd-click (or Ctrl-click) the corresponding text object (e.g. `MyDesign-lid-text`) to add it to the selection. (Or press Cmd+A to select all objects on the plate.)
+1. Click the body object that contains the text (e.g. `MyDesign-lid`) in the Objects list.
+2. Cmd-click (or Ctrl-click) the corresponding text object (e.g. `MyDesign-lid-text`) to add it to the selection. 
 3. Right-click on any selected object -> **Merge**.
 
 After the merge, the assembly behaves as a single part for positioning and slicing, but each sub-part keeps its own filament index -- which is exactly what makes the body print in one color and the text in another.
 
-![Objects panel after merge -- body on filament 2, text on filament 5](images/bs-objects-filaments.png)
+![Objects panel after merge -- body on filament 1, text on filament 2](images/bs-objects-filaments.png)
 
 If you have separate-body labels on the box body AS WELL AS on the lid, repeat the merge for the box pair: select `MyDesign-box` and `MyDesign-box-text` and merge them too.
+
+After the Merge, arrange the pieces on the build plate as you like (or right-click and choose Arrange).
+
+After an arrange, a tall 2-color prime tower also appears; it shrinks once filament grouping is set (below).
 
 ## Slicing the part
 
@@ -196,6 +187,8 @@ Force both filaments onto Main:
 
 You'll see a wipe tower next to your part -- that's where the printer purges between AMS color swaps.
 
+![Filament grouping dialog -- both filaments on Main Extruder, Auxiliary Extruder empty](images/bs-filament-grouping-ams.png)
+
 ### Path B: External holder + Aux nozzle
 
 Body filament is in the AMS; text filament is in the External holder. Bambu Studio's default grouping mode (Filament-Saving) may still consolidate both filaments onto the Main nozzle to "save" a tool change -- leaving the Aux nozzle empty and silently printing your text in the body color. If this happens you will need to do the next step.
@@ -206,7 +199,7 @@ Force the dual-nozzle mapping:
 2. Drag filaments between **Main Extruder** and **Auxiliary Extruder** columns so the **text filament sits on Auxiliary** and the **body filament sits on Main**.
 3. Click **OK** and re-slice.
 
-![Filament grouping dialog with Custom selected -- body filament on Main, text filament on Auxiliary](images/bs-filament-grouping.png)
+![Filament grouping dialog with Custom selected -- body filament on Main, text filament on Auxiliary](images/bs-filament-grouping-external.png)
 
 ### How to tell the slice actually went multi-color (both paths)
 
@@ -238,7 +231,6 @@ Click OK and re-slice.
 
 **2. Save the project.** Cmd+S the `.3mf` after the Custom regroup succeeds. The Custom mapping is stored at the plate level inside the file, and saving locks it in so re-opening doesn't revert to Auto.
 
-**3. If you saw the "Standard 3mf Import color" dialog during import**, re-import the BoxMaker 3MF and click **OK** without changing the Matching column. Then delete any appended filament slots from Project Filaments. Using the dialog's color-matching feature is a known source of silent failure on this workflow even though it shouldn't normally appear with BoxMaker's 3MF.
 
 ### "Conflicts of gcode paths have been found at layer 1."
 
@@ -256,12 +248,4 @@ Your text height is too small for the current nozzle. Try, in order of effort:
 
 You're using `emboss` instead of `deboss` with `SeparateBody=yes`. With emboss, the body sits **on top of** the lid and protrudes by Depth mm. That's a valid mode (raised lettering in a different color) but if you wanted flush text, change Type to `deboss` in the Text Labels input.
 
-### Want to verify the 3MF is correct before importing?
 
-The file is a ZIP archive. From a terminal:
-
-```sh
-unzip -p "your-file.3mf" 3D/3dmodel.model | head -50
-```
-
-The first line should be `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`. Look for `unit="millimeter"` in the `<model>` tag -- BoxMaker exports it this way explicitly. The `<object>` entries should be named `<designname>-box`, `<designname>-lid`, and (if you have separate-body text) `<designname>-box-text` and/or `<designname>-lid-text`.
