@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as opentype from 'opentype.js';
-import { Section } from './ui';
+import { Section, WarningList } from './ui';
 import { GROUP_COLORS } from '@/config/colors';
 import { useDesign } from '@/store/useDesign';
+import { textLabelWarnings } from '@/validation/checks';
 import {
   BUNDLED_FONT_NAMES,
   registerCustomFont,
@@ -19,6 +20,10 @@ export function TextLabelsControls() {
   const setText = useDesign((s) => s.setTextLabelsText);
   const labels = useDesign((s) => s.textLabels);
   const errors = useDesign((s) => s.textLabelErrors);
+  const box = useDesign((s) => s.box);
+  const lid = useDesign((s) => s.lid);
+
+  const warnings = useMemo(() => textLabelWarnings(box, lid, labels), [box, lid, labels]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [customFontName, setCustomFontName] = useState<string | null>(null);
@@ -145,6 +150,11 @@ export function TextLabelsControls() {
             {errors.length === 1 ? '' : 's'} {errors.map((e) => e.line).join(', ')}
           </span>
         )}
+        {warnings.length > 0 && (
+          <span className="text-amber-400 ml-2">
+            * {warnings.length} warning{warnings.length === 1 ? '' : 's'}
+          </span>
+        )}
       </div>
       {errors.length > 0 && (
         <ul className="text-[10px] text-red-400 mt-1 pl-3 list-disc">
@@ -155,6 +165,7 @@ export function TextLabelsControls() {
           ))}
         </ul>
       )}
+      <WarningList warnings={warnings} />
     </Section>
   );
 }

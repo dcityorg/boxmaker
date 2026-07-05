@@ -137,7 +137,7 @@ const HELP_SECTIONS: HelpSection[] = [
       {
         type: 'paragraph',
         text:
-          'Wall thickness applies to all four side walls; floor thickness to the bottom. Defaults are 2 mm each -- enough strength for typical PETG / PLA at 0.4 mm nozzle without burning extra filament.',
+          'Wall thickness applies to all four side walls; floor thickness to the bottom. Defaults are 2 mm each -- enough strength for typical PETG / PLA at 0.4 mm nozzle without burning extra filament. Values under 0.8 mm (about 2 perimeters at a 0.4 mm nozzle) trigger an amber thin-wall warning; the same rule applies to the lid thicknesses.',
       },
       { type: 'heading', text: 'Corner radii' },
       {
@@ -155,7 +155,7 @@ const HELP_SECTIONS: HelpSection[] = [
       {
         type: 'paragraph',
         text:
-          'The shoulder is the block that fits inside the box opening with `Box gap` clearance. `Wall` is the shoulder\'s wall thickness; `Depth` is how far it hangs below the lid plate (and also the snap-fit engagement depth).',
+          'The shoulder is the block that fits inside the box opening with `Box gap` clearance. `Wall` is the shoulder\'s wall thickness; `Depth` is how far it hangs below the lid plate (and also the snap-fit engagement depth). A `Box gap` of 0 triggers a warning -- without clearance the lid physically can\'t slide in.',
       },
       {
         type: 'tip',
@@ -195,7 +195,7 @@ const HELP_SECTIONS: HelpSection[] = [
       {
         type: 'paragraph',
         text:
-          'Four sanity checks on the nub geometry. The sidebar shows an amber warning when any of these is violated:',
+          'Six sanity checks on the nub geometry. The sidebar shows an amber warning when any of these is violated:',
       },
       {
         type: 'list',
@@ -204,6 +204,8 @@ const HELP_SECTIONS: HelpSection[] = [
           '`Nub height` must not exceed `Lid shoulder depth`. The cavity has the same vertical span as the nub; if the nub is taller than the shoulder, the cavity extends past the shoulder bottom and the nub can\'t seat.',
           '`Nub height` below 2 mm tends to print poorly -- the small triangular ridge under-extrudes or loses definition on typical FDM printers.',
           '`Nub height` above 5 mm makes the lid hard to seat -- walls don\'t flex enough to pass that much apex during insertion.',
+          '`Lid lead-in` should stay below `Nub height` -- a chamfer larger than the nub swallows the cavity edge and the clip may not retain.',
+          '`Min width` must not exceed `Max width` -- when the clamps conflict, the max wins. Almost always a typo.',
         ],
       },
       { type: 'heading', text: 'Reference settings' },
@@ -266,6 +268,12 @@ floor,86,10,6,8,2.6,7,1
 floor,10,56,6,8,2.6,7,1
 floor,86,56,6,8,2.6,7,1`,
       },
+      { type: 'heading', text: 'Warnings' },
+      {
+        type: 'paragraph',
+        text:
+          'Amber warnings below the list flag lines that parse fine but produce broken parts: `HoleDia` >= `OD`, standoff walls too thin to print, a fillet larger than the standoff radius, standoffs positioned off the surface, holes punching through the host material, and -- most importantly -- a floor standoff tall enough to hit the assembled lid (the check accounts for the extra headroom under the lid\'s center pocket). Warnings with a location also paint a translucent red highlight on the offending standoff in the 3D view; for a lid collision, only the too-tall portion is highlighted. Fix the line and both disappear. Warnings never block geometry.',
+      },
     ],
   },
   {
@@ -308,6 +316,12 @@ front,Round,48,20,10
 lid,Rect,44,28,40,20,2
 // Reset button on the left wall
 left,Round,30,15,4`,
+      },
+      { type: 'heading', text: 'Warnings' },
+      {
+        type: 'paragraph',
+        text:
+          'Amber warnings flag cutouts that extend past their surface, and lid cutouts that reach into the shoulder rim (which can weaken the shoulder). A translucent red highlight marks the offending cutout in the 3D view. An intentional over-the-rim notch (e.g., a cable slot crossing the box\'s top edge) still warns -- warnings never block geometry, so just ignore it.',
       },
     ],
   },
@@ -388,6 +402,12 @@ lid,44,15,emboss,0.6,4,back,JetBrains Mono,no,yes,v1.0
 
 // Floor -- maker's mark (auto-mirrored)
 floor,48,33,deboss,0.4,4,back,Open Sans,no,no,BoxMaker`,
+      },
+      { type: 'heading', text: 'Warnings' },
+      {
+        type: 'paragraph',
+        text:
+          'Amber warnings flag a deboss `Depth` that cuts all the way through the host material (wall, floor, or lid center) and a `Height` under 2 mm, which rarely prints cleanly. For a through-cut, a small red marker in the 3D view locates the offending label. Warnings never block geometry.',
       },
     ],
   },
@@ -611,6 +631,12 @@ floor,48,33,deboss,0.4,4,back,Open Sans,no,no,BoxMaker`,
         type: 'paragraph',
         text:
           'Check the `Direction` field. `Direction=floor` makes the top of the letters point toward the floor edge (downward). For upright text on a wall, use `Direction=lid`.',
+      },
+      { type: 'heading', text: 'What is the translucent red shape in the 3D view?' },
+      {
+        type: 'paragraph',
+        text:
+          'A validation highlight -- it marks a feature with a problem (a standoff tall enough to hit the lid, a cutout off its surface, a deboss that cuts through the material). The matching amber warning in the sidebar explains the problem and names the offending line. Fix the value and the highlight disappears; there is no toggle. Warnings never block geometry or exports.',
       },
       { type: 'heading', text: 'How do I share a design with someone?' },
       {

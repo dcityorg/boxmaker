@@ -10,6 +10,7 @@ import { GroundGrid, AxisRulers } from './SceneHelpers';
 import { BoxMesh } from './BoxMesh';
 import { LidMesh } from './LidMesh';
 import { OriginMarkers } from './OriginMarkers';
+import { WarningMarkers } from './WarningMarkers';
 import { ViewCube, type ViewDirection } from './ViewCube';
 import { useDesign, exteriorDimensions, type BoxParams, type LidParams } from '@/store/useDesign';
 import { lidAssembledOffset } from '@/geometry/lid';
@@ -286,6 +287,7 @@ export function Viewport() {
         <BoxMesh />
         <LidMesh />
         <OriginMarkers />
+        <WarningMarkers />
 
         <OrbitControls
           ref={controlsRef}

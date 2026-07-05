@@ -73,6 +73,9 @@ export interface SnapFitParams {
  * `standoffs` is derived by parsing that text on every edit.
  */
 export interface StandoffParams {
+  /** 1-based source line in the textarea; set by the parser so validation
+   *  warnings can point back at the offending line. */
+  line?: number;
   surface: 'floor' | 'lid';
   x: number;          // mm from interior front-left, along box length
   y: number;          // mm from interior front-left, along box width
@@ -105,6 +108,7 @@ export type CutoutSurface = 'front' | 'back' | 'left' | 'right' | 'floor' | 'lid
  */
 export type CutoutParams =
   | {
+      line?: number;   // 1-based textarea line, set by the parser
       surface: CutoutSurface;
       kind: 'round';
       x: number;
@@ -112,6 +116,7 @@ export type CutoutParams =
       diameter: number;
     }
   | {
+      line?: number;   // 1-based textarea line, set by the parser
       surface: CutoutSurface;
       kind: 'rect';
       x: number;
@@ -153,6 +158,8 @@ export type TextLabelDirection = 'front' | 'back' | 'left' | 'right' | 'lid' | '
  * or subtracted from the host), enabling multi-color printing via 3MF.
  */
 export interface TextLabelParams {
+  /** 1-based textarea line, set by the parser (see StandoffParams.line). */
+  line?: number;
   surface: TextLabelSurface;
   type: 'emboss' | 'deboss';
   x: number;
@@ -321,6 +328,7 @@ export function parseTextLabelsText(text: string): {
     }
 
     labels.push({
+      line: i + 1,
       surface: surface as TextLabelSurface,
       type: type as 'emboss' | 'deboss',
       x,
@@ -386,7 +394,7 @@ export function parseCutoutsText(text: string): {
         continue;
       }
       const [x, y, diameter] = nums;
-      cutouts.push({ surface: surface as CutoutSurface, kind: 'round', x, y, diameter });
+      cutouts.push({ line: i + 1, surface: surface as CutoutSurface, kind: 'round', x, y, diameter });
     } else if (kind === 'rect') {
       if (tokens.length !== 7) {
         errors.push({
@@ -402,6 +410,7 @@ export function parseCutoutsText(text: string): {
       }
       const [x, y, width, height, cornerRadius] = nums;
       cutouts.push({
+        line: i + 1,
         surface: surface as CutoutSurface,
         kind: 'rect',
         x,
@@ -460,6 +469,7 @@ export function parseStandoffsText(text: string): {
 
     const [x, y, od, height, holeDia, holeDepth, baseFillet] = nums;
     standoffs.push({
+      line: i + 1,
       surface: surface as 'floor' | 'lid',
       x, y, od, height, holeDia, holeDepth, baseFillet,
     });

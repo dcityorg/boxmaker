@@ -1,6 +1,7 @@
 'use client';
 
-import { Section, NumberInput, RadioRow } from './ui';
+import { useMemo } from 'react';
+import { Section, NumberInput, RadioRow, WarningList } from './ui';
 import { GROUP_COLORS } from '@/config/colors';
 import {
   useDesign,
@@ -9,6 +10,7 @@ import {
   interiorToExterior,
   type DimensionMode,
 } from '@/store/useDesign';
+import { boxWarnings } from '@/validation/checks';
 
 const MODE_OPTIONS = [
   { value: 'exterior', label: 'Exterior' },
@@ -50,6 +52,8 @@ export function BoxControls() {
 
   const otherLabel = box.mode === 'exterior' ? 'Interior' : 'Exterior';
   const other = box.mode === 'exterior' ? intr : ext;
+
+  const warnings = useMemo(() => boxWarnings(box), [box]);
 
   return (
     <>
@@ -103,6 +107,7 @@ export function BoxControls() {
         titleColor={GROUP_COLORS.box}
         tooltip="Material thickness of the four side walls and the bottom floor"
       >
+        <WarningList warnings={warnings} />
         <NumberInput
           label="Wall"
           value={box.wallThickness}

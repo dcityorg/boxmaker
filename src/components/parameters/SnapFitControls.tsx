@@ -1,49 +1,10 @@
 'use client';
 
-import { Section, NumberInput, Toggle } from './ui';
+import { useMemo } from 'react';
+import { Section, NumberInput, Toggle, WarningList } from './ui';
 import { GROUP_COLORS } from '@/config/colors';
-import { useDesign, type LidParams, type SnapFitParams } from '@/store/useDesign';
-
-/**
- * Geometric and sizing warnings for the snap-fit clip. Returns 0..4 warning
- * strings ready to render. Pure function -- no store deps.
- *
- * Geometric (hard "will break") cases:
- *   - Apex of the nub (depth = nubHeight / 2) cuts into the lid shoulder. If
- *     it exceeds shoulder wall thickness, the cavity pokes through to the
- *     inner face.
- *   - Cavity height = nubHeight. If it exceeds shoulder depth, the cavity
- *     extends past the shoulder bottom and the nub can't seat.
- *
- * Sizing (heuristic "may") cases:
- *   - Nub heights below 2 mm tend to print poorly.
- *   - Nub heights above 5 mm make the lid hard to seat (wall flex limits).
- */
-function computeSnapFitWarnings(snap: SnapFitParams, lid: LidParams): string[] {
-  const warnings: string[] = [];
-  const apexDepth = snap.nubHeight / 2;
-  if (apexDepth > lid.coverShoulderWallThickness) {
-    warnings.push(
-      `Nub apex (${apexDepth.toFixed(2)} mm) exceeds shoulder wall thickness (${lid.coverShoulderWallThickness.toFixed(2)} mm). The cavity will break through the inner face of the lid shoulder. Reduce Nub height or increase Lid shoulder wall.`
-    );
-  }
-  if (snap.nubHeight > lid.coverShoulderDepth) {
-    warnings.push(
-      `Nub height (${snap.nubHeight.toFixed(2)} mm) exceeds shoulder depth (${lid.coverShoulderDepth.toFixed(2)} mm). The cavity will extend past the bottom of the lid shoulder. Reduce Nub height or increase Lid shoulder depth.`
-    );
-  }
-  if (snap.nubHeight < 2) {
-    warnings.push(
-      `Nub height (${snap.nubHeight.toFixed(2)} mm) is below 2 mm -- the printed nub may not form cleanly.`
-    );
-  }
-  if (snap.nubHeight > 5) {
-    warnings.push(
-      `Nub height (${snap.nubHeight.toFixed(2)} mm) is above 5 mm -- the lid may be difficult to get on.`
-    );
-  }
-  return warnings;
-}
+import { useDesign } from '@/store/useDesign';
+import { snapWarnings } from '@/validation/checks';
 
 export function SnapFitControls() {
   const snap = useDesign((s) => s.snap);
@@ -51,7 +12,10 @@ export function SnapFitControls() {
   const lid = useDesign((s) => s.lid);
 
   const anyEnabled = snap.snapFront || snap.snapBack || snap.snapLeft || snap.snapRight;
-  const warnings = anyEnabled ? computeSnapFitWarnings(snap, lid) : [];
+  const warnings = useMemo(
+    () => (anyEnabled ? snapWarnings(snap, lid) : []),
+    [anyEnabled, snap, lid]
+  );
 
   return (
     <Section
@@ -90,19 +54,7 @@ export function SnapFitControls() {
           tooltip="Enable snap-fit clip on the right wall"
         />
       </div>
-      {warnings.length > 0 && (
-        <div className="mt-2 mb-1 flex flex-col gap-1.5">
-          {warnings.map((w, i) => (
-            <div
-              key={i}
-              className="text-[10px] px-2 py-1.5 rounded bg-amber-500/10 border border-amber-500/30 text-[var(--text-secondary)] leading-snug"
-            >
-              <span className="font-medium text-amber-400">Warning: </span>
-              {w}
-            </div>
-          ))}
-        </div>
-      )}
+      <WarningList warnings={warnings} />
       <NumberInput
         label="Nub height"
         value={snap.nubHeight}

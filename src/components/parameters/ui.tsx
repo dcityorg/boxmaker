@@ -283,6 +283,34 @@ export function Section({
   );
 }
 
+/**
+ * Amber warning boxes for design-validation results (src/validation/checks.ts).
+ * Semantic warnings only -- parse errors keep the existing red list style.
+ * Warnings with a `line` get a "line N:" prefix pointing at the textarea.
+ */
+export function WarningList({
+  warnings,
+}: {
+  warnings: { line?: number; message: string }[];
+}) {
+  if (warnings.length === 0) return null;
+  return (
+    <div className="mt-2 mb-1 flex flex-col gap-1.5">
+      {warnings.map((w, i) => (
+        <div
+          key={i}
+          className="text-[10px] px-2 py-1.5 rounded bg-amber-500/10 border border-amber-500/30 text-[var(--text-secondary)] leading-snug"
+        >
+          <span className="font-medium text-amber-400">
+            Warning: {w.line !== undefined && `line ${w.line}: `}
+          </span>
+          {w.message}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /** Group header label for visual separation between section groups */
 export function GroupHeader({ label, color }: { label: string; color: string }) {
   return (

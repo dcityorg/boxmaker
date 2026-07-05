@@ -1,14 +1,20 @@
 'use client';
 
-import { Section } from './ui';
+import { useMemo } from 'react';
+import { Section, WarningList } from './ui';
 import { GROUP_COLORS } from '@/config/colors';
 import { useDesign } from '@/store/useDesign';
+import { cutoutWarnings } from '@/validation/checks';
 
 export function CutoutsControls() {
   const text = useDesign((s) => s.cutoutsText);
   const setText = useDesign((s) => s.setCutoutsText);
   const cutouts = useDesign((s) => s.cutouts);
   const errors = useDesign((s) => s.cutoutErrors);
+  const box = useDesign((s) => s.box);
+  const lid = useDesign((s) => s.lid);
+
+  const warnings = useMemo(() => cutoutWarnings(box, lid, cutouts), [box, lid, cutouts]);
 
   return (
     <Section
@@ -49,6 +55,11 @@ export function CutoutsControls() {
             {errors.length === 1 ? '' : 's'} {errors.map((e) => e.line).join(', ')}
           </span>
         )}
+        {warnings.length > 0 && (
+          <span className="text-amber-400 ml-2">
+            * {warnings.length} warning{warnings.length === 1 ? '' : 's'}
+          </span>
+        )}
       </div>
       {errors.length > 0 && (
         <ul className="text-[10px] text-red-400 mt-1 pl-3 list-disc">
@@ -59,6 +70,7 @@ export function CutoutsControls() {
           ))}
         </ul>
       )}
+      <WarningList warnings={warnings} />
     </Section>
   );
 }

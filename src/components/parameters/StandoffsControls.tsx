@@ -1,14 +1,23 @@
 'use client';
 
-import { Section } from './ui';
+import { useMemo } from 'react';
+import { Section, WarningList } from './ui';
 import { GROUP_COLORS } from '@/config/colors';
 import { useDesign } from '@/store/useDesign';
+import { standoffWarnings } from '@/validation/checks';
 
 export function StandoffsControls() {
   const text = useDesign((s) => s.standoffsText);
   const setText = useDesign((s) => s.setStandoffsText);
   const standoffs = useDesign((s) => s.standoffs);
   const errors = useDesign((s) => s.standoffErrors);
+  const box = useDesign((s) => s.box);
+  const lid = useDesign((s) => s.lid);
+
+  const warnings = useMemo(
+    () => standoffWarnings(box, lid, standoffs),
+    [box, lid, standoffs]
+  );
 
   return (
     <Section
@@ -50,6 +59,11 @@ export function StandoffsControls() {
             {errors.length === 1 ? '' : 's'} {errors.map((e) => e.line).join(', ')}
           </span>
         )}
+        {warnings.length > 0 && (
+          <span className="text-amber-400 ml-2">
+            · {warnings.length} warning{warnings.length === 1 ? '' : 's'}
+          </span>
+        )}
       </div>
       {errors.length > 0 && (
         <ul className="text-[10px] text-red-400 mt-1 pl-3 list-disc">
@@ -60,6 +74,7 @@ export function StandoffsControls() {
           ))}
         </ul>
       )}
+      <WarningList warnings={warnings} />
     </Section>
   );
 }
