@@ -154,6 +154,16 @@ export function BoardsControls() {
             <div>Size, X, Y &nbsp;— board outline (mm)</div>
             <div>Thickness, T &nbsp;— default 1.6</div>
             <div>CornerRadius, R &nbsp;— default 0</div>
+            <div>
+              Height, H &nbsp;— total height above the NON-component face, INCLUDING the board and
+              anything stacked on it. Drives the clearance ghost. 0 or omitted = unmeasured, drawn as a
+              bare PCB.
+            </div>
+            <div>
+              HeightBelow, H &nbsp;— anything sticking out below the board (leads, a solder-side
+              connector). Default 0. This is what hits the mounting surface when the standoffs are too
+              short.
+            </div>
           </div>
           <div className="mb-1">
             <code className="not-italic">[mounts]</code> — <code className="not-italic">X,​Y,​BoardHoleDia</code>
