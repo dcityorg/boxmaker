@@ -91,7 +91,10 @@ export interface BoardEdgeCutout {
   clearance: number;
 }
 
-/** A "nothing else here" volume: a tall component, a connector, a header. */
+/**
+ * A "nothing else here" volume: a tall component, a connector, a header.
+ * x, y is the CENTRE, matching BoardCutout rather than a corner.
+ */
 export interface BoardKeepout {
   line?: number;
   x: number;

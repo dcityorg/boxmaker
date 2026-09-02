@@ -213,7 +213,7 @@ bottom, Round, 10.0,  5.0, 3.5, 0.3
 x-, 15.0, 3.1, 9.0, 3.5, 0.5, 0.4
 
 [keepouts]                     // OPTIONAL: X, Y, SizeX, SizeY, Height, Side
-0, 0, 50.8, 22.86, 8, top
+25.4, 11.43, 50.8, 22.86, 8, top   // X,Y is the CENTRE, as in [cutouts]
 ```
 
 Shape args mirror the existing cutout syntax exactly: `Round` takes `Diameter`, `Rect`

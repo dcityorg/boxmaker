@@ -63,6 +63,59 @@ export function BoardsControls() {
         className="hidden"
       />
 
+      {/* ---- board file format ------------------------------------------ */}
+      <details className="mb-2">
+        <summary className="text-[10px] text-[var(--text-secondary)] cursor-pointer select-none hover:text-[var(--text-primary)]">
+          Board file format
+        </summary>
+        <div className="text-[10px] text-[var(--text-secondary)] italic mt-1 leading-snug">
+          <div className="mb-1">
+            A board is a plain text file. 0,0 is a corner you pick, viewed from the COMPONENT side;
+            +X right, +Y up. Board Z = 0 is the non-component face, +Z toward the components.
+            Use <code className="not-italic">{'//'}</code> for comments, anywhere on a line.
+          </div>
+          <div className="mb-1">
+            <code className="not-italic">[board]</code> — key,value lines. Name and Size required.
+            <div>Name, MyBoard &nbsp;— matched to BoardName below</div>
+            <div>Size, X, Y &nbsp;— board outline (mm)</div>
+            <div>Thickness, T &nbsp;— default 1.6</div>
+            <div>CornerRadius, R &nbsp;— default 0</div>
+          </div>
+          <div className="mb-1">
+            <code className="not-italic">[mounts]</code> — <code className="not-italic">X,​Y,​BoardHoleDia</code>
+            <div>One mounting hole per line; each becomes a standoff.</div>
+            <div>BoardHoleDia is the hole in the BOARD — the standoff&apos;s own size comes from the placement line below.</div>
+          </div>
+          <div className="mb-1">
+            <code className="not-italic">[cutouts]</code> — holes through the floor or lid
+            <div><code className="not-italic">Side,​Round,​X,​Y,​Diameter,​Clearance</code></div>
+            <div><code className="not-italic">Side,​Rect,​X,​Y,​SizeX,​SizeY,​CornerRadius,​Clearance</code></div>
+            <div>
+              Side: <code className="not-italic">top</code> or <code className="not-italic">bottom</code> — which face of the
+              BOARD, never the box. Which box surface gets cut is worked out from the placement.
+            </div>
+            <div>X,Y = center of the opening (mm)</div>
+          </div>
+          <div className="mb-1">
+            <code className="not-italic">[edges]</code> — connector holes through a side wall
+            <div><code className="not-italic">Edge,​Pos,​Z,​SizeAlong,​SizeZ,​CornerRadius,​Clearance</code></div>
+            <div>
+              Edge: <code className="not-italic">x+ x- y+ y-</code> — which board edge, x+ being the one at maximum board X
+            </div>
+            <div>Pos = along that edge: board Y for x+/x-, board X for y+/y-</div>
+            <div>Z = center height above the NON-component face, so add the board thickness (a jack 1.5 above a 1.6 board is 3.1)</div>
+          </div>
+          <div className="mb-1">
+            <code className="not-italic">[keepouts]</code> — optional, for tall parts
+            <div><code className="not-italic">X,​Y,​SizeX,​SizeY,​Height,​Side</code> — X,Y = center</div>
+          </div>
+          <div>
+            Clearance is added on EVERY side, so the opening grows by twice it: 10 wide with
+            Clearance 0.4 cuts as 10.8.
+          </div>
+        </div>
+      </details>
+
       {library.length === 0 ? (
         <div className="text-[10px] text-[var(--text-secondary)] italic mb-2">
           No boards loaded. Import a .board.txt file, then place it below by name.
