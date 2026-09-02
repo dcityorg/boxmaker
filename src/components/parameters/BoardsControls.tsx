@@ -137,24 +137,6 @@ export function BoardsControls() {
       titleColor={GROUP_COLORS.boards}
       tooltip="Place a PC board defined in a reusable .board.txt file. Its mounting holes become standoffs and its component cutouts are cut through whichever surface they face."
     >
-      {/* ---- library ---------------------------------------------------- */}
-      <button
-        onClick={handleImportClick}
-        className="w-full px-2 py-1 mb-2 text-xs bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded hover:bg-[var(--border-color)] transition-colors text-[var(--text-secondary)]"
-        title="Import a board definition file. Re-importing a board with the same name replaces it, so you can edit the file and import again without deleting it first. The definition is stored inside this design, so the design still renders on a machine that does not have the file."
-      >
-        + Import board file
-      </button>
-      {/*
-        No `accept` filter, deliberately. macOS greys out anything the filter
-        does not match, with no explanation -- so a board file saved as
-        `.board`, or as `.rtf` by TextEdit, simply cannot be picked and the user
-        is left guessing. A board file is just text; the parser validates the
-        contents and says exactly what is wrong, which is a far better failure
-        than an unclickable filename.
-      */}
-      <input ref={fileInputRef} type="file" onChange={handleImportFallback} className="hidden" />
-
       {/* ---- board file format ------------------------------------------ */}
       <details className="mb-2">
         <summary className="text-[10px] text-[var(--text-secondary)] cursor-pointer select-none hover:text-[var(--text-primary)]">
@@ -209,6 +191,24 @@ export function BoardsControls() {
         </div>
       </details>
 
+      {/* ---- library ---------------------------------------------------- */}
+      <button
+        onClick={handleImportClick}
+        className="w-full px-2 py-1 mb-2 text-xs bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded hover:bg-[var(--border-color)] transition-colors text-[var(--text-secondary)]"
+        title="Import a board definition file. Re-importing a board with the same name replaces it, so you can edit the file and import again without deleting it first. The definition is stored inside this design, so the design still renders on a machine that does not have the file."
+      >
+        + Import board file
+      </button>
+      {/*
+        No `accept` filter, deliberately. macOS greys out anything the filter
+        does not match, with no explanation -- so a board file saved as
+        `.board`, or as `.rtf` by TextEdit, simply cannot be picked and the user
+        is left guessing. A board file is just text; the parser validates the
+        contents and says exactly what is wrong, which is a far better failure
+        than an unclickable filename.
+      */}
+      <input ref={fileInputRef} type="file" onChange={handleImportFallback} className="hidden" />
+
       {library.length === 0 ? (
         <div className="text-[10px] text-[var(--text-secondary)] italic mb-2">
           No boards loaded. Import a .board.txt file, then place it below by name.
@@ -257,7 +257,11 @@ export function BoardsControls() {
       )}
 
       {/* ---- placements -------------------------------------------------- */}
-      <div className="text-[10px] text-[var(--text-secondary)] italic mb-2 leading-snug">
+      <details className="mb-2">
+        <summary className="text-[10px] text-[var(--text-secondary)] cursor-pointer select-none hover:text-[var(--text-primary)]">
+          Board placement format
+        </summary>
+        <div className="text-[10px] text-[var(--text-secondary)] italic mt-1 leading-snug">
         <div>
           Format: <code className="not-italic">Surface,​X,​Y,​Rotation,​Components,​StandoffHeight,​StandoffOD,​StandoffHoleDia,​HoleDepth,​BaseFilletRadius,​BoardName</code>
         </div>
@@ -275,7 +279,8 @@ export function BoardsControls() {
         <div>
           Use <code className="not-italic">{'//'}</code> for comments
         </div>
-      </div>
+        </div>
+      </details>
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
