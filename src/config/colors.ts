@@ -6,6 +6,7 @@
 /** Colors for sidebar section group headers and section titles */
 export const GROUP_COLORS = {
   box:       '#7BA3CF',  // Soft blue   — Box & Lid
+  boards:    '#6FB0B8',  // Soft teal   — Boards
   standoffs: '#C9A84C',  // Warm amber  — Standoffs
   cutouts:   '#7BAF7B',  // Sage green  — Cutouts
   text:      '#A78BBA',  // Soft purple — Text Labels

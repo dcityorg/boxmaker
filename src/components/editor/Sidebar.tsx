@@ -4,6 +4,7 @@ import { useRef, useState, useCallback, useEffect } from 'react';
 import { UI_MUTED, GROUP_COLORS } from '@/config/colors';
 import { APP_VERSION } from '@/config/version';
 import { useDesign } from '@/store/useDesign';
+import { effectiveFeatures } from '@/board/compileAll';
 import { GroupHeader } from '@/components/parameters/ui';
 import { PresetPicker } from '@/components/editor/PresetPicker';
 import type { Preset } from '@/data/presets';
@@ -11,6 +12,7 @@ import { SettingsControls } from '@/components/parameters/SettingsControls';
 import { BoxControls } from '@/components/parameters/BoxControls';
 import { LidControls } from '@/components/parameters/LidControls';
 import { SnapFitControls } from '@/components/parameters/SnapFitControls';
+import { BoardsControls } from '@/components/parameters/BoardsControls';
 import { StandoffsControls } from '@/components/parameters/StandoffsControls';
 import { CutoutsControls } from '@/components/parameters/CutoutsControls';
 import { TextLabelsControls } from '@/components/parameters/TextLabelsControls';
@@ -236,7 +238,10 @@ export function Sidebar({ helpOpen, onToggleHelp, undo, redo, canUndo, canRedo }
   const handleExport3MF = async () => {
     setExporting(true);
     try {
-      const { box, lid, snap, standoffs, cutouts, textLabels } = useDesign.getState();
+      const state = useDesign.getState();
+      const { box, lid, snap, textLabels } = state;
+      // Exports must include board-generated features, same as the viewport.
+      const { standoffs, cutouts } = effectiveFeatures(state);
       const baseName = designName || 'boxmaker';
 
       const boxManifold = await buildBox(box, lid, snap, standoffs, cutouts, textLabels);
@@ -274,7 +279,10 @@ export function Sidebar({ helpOpen, onToggleHelp, undo, redo, canUndo, canRedo }
   const handleExportSTL = async () => {
     setExporting(true);
     try {
-      const { box, lid, snap, standoffs, cutouts, textLabels } = useDesign.getState();
+      const state = useDesign.getState();
+      const { box, lid, snap, textLabels } = state;
+      // Exports must include board-generated features, same as the viewport.
+      const { standoffs, cutouts } = effectiveFeatures(state);
       const baseName = designName || 'boxmaker';
 
       const boxManifold = await buildBox(box, lid, snap, standoffs, cutouts, textLabels);
@@ -480,6 +488,9 @@ export function Sidebar({ helpOpen, onToggleHelp, undo, redo, canUndo, canRedo }
           <BoxControls />
           <LidControls />
           <SnapFitControls />
+
+          <GroupHeader label="Boards" color={GROUP_COLORS.boards} />
+          <BoardsControls />
 
           <GroupHeader label="Standoffs" color={GROUP_COLORS.standoffs} />
           <StandoffsControls />

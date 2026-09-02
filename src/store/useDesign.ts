@@ -492,6 +492,9 @@ export function parseStandoffsText(text: string): {
   return { standoffs, errors };
 }
 
+import { parseBoardsText } from '@/board/parsePlacements';
+import type { BoardDefinition, BoardPlacement, BoardPlacementParseError } from '@/board/types';
+
 export interface AppearanceSettings {
   boxColor: string;
   lidColor: string;
@@ -516,6 +519,15 @@ export interface DesignState {
   textLabelsText: string;
   textLabels: TextLabelParams[];
   textLabelErrors: TextLabelParseError[];
+  /**
+   * Placed boards. `boardsText` is canonical; `boards` is derived from it.
+   * `boardLibrary` holds the imported *.board.txt definitions BY VALUE, so a
+   * saved design renders on a machine that has never seen the board files.
+   */
+  boardsText: string;
+  boards: BoardPlacement[];
+  boardErrors: BoardPlacementParseError[];
+  boardLibrary: BoardDefinition[];
 
   setDesignName: (name: string | null) => void;
   setAppearance: (patch: Partial<AppearanceSettings>) => void;
@@ -529,6 +541,10 @@ export interface DesignState {
   setStandoffsText: (text: string) => void;
   setCutoutsText: (text: string) => void;
   setTextLabelsText: (text: string) => void;
+  setBoardsText: (text: string) => void;
+  /** Add or replace a board definition by name (case-insensitive). */
+  addBoardToLibrary: (board: BoardDefinition) => void;
+  removeBoardFromLibrary: (name: string) => void;
   /**
    * Replace all design state in one shot (used by Load Design / URL share /
    * localStorage restore). Skips the per-setter isDirty machinery and marks
@@ -570,6 +586,7 @@ export const DEFAULT_LID: LidParams = {
 export const DEFAULT_STANDOFFS_TEXT = '';
 export const DEFAULT_CUTOUTS_TEXT = '';
 export const DEFAULT_TEXT_LABELS_TEXT = '';
+export const DEFAULT_BOARDS_TEXT = '';
 
 export const DEFAULT_SNAP: SnapFitParams = {
   snapFront: true,
@@ -600,6 +617,10 @@ export const useDesign = create<DesignState>((set) => ({
   textLabelsText: DEFAULT_TEXT_LABELS_TEXT,
   textLabels: [],
   textLabelErrors: [],
+  boardsText: DEFAULT_BOARDS_TEXT,
+  boards: [],
+  boardErrors: [],
+  boardLibrary: [],
 
   setDesignName: (name) => set({ designName: name }),
   setAppearance: (patch) =>
@@ -623,6 +644,24 @@ export const useDesign = create<DesignState>((set) => ({
     const { labels, errors } = parseTextLabelsText(text);
     set({ textLabelsText: text, textLabels: labels, textLabelErrors: errors, isDirty: true });
   },
+  setBoardsText: (text) => {
+    const { placements, errors } = parseBoardsText(text);
+    set({ boardsText: text, boards: placements, boardErrors: errors, isDirty: true });
+  },
+  addBoardToLibrary: (board) =>
+    set((s) => {
+      const k = board.name.trim().toLowerCase();
+      const rest = s.boardLibrary.filter((b) => b.name.trim().toLowerCase() !== k);
+      return { boardLibrary: [...rest, board], isDirty: true };
+    }),
+  removeBoardFromLibrary: (name) =>
+    set((s) => {
+      const k = name.trim().toLowerCase();
+      return {
+        boardLibrary: s.boardLibrary.filter((b) => b.name.trim().toLowerCase() !== k),
+        isDirty: true,
+      };
+    }),
   newDesign: () =>
     set({
       designName: null,
@@ -639,12 +678,19 @@ export const useDesign = create<DesignState>((set) => ({
       textLabelsText: DEFAULT_TEXT_LABELS_TEXT,
       textLabels: [],
       textLabelErrors: [],
+      boardsText: DEFAULT_BOARDS_TEXT,
+      boards: [],
+      boardErrors: [],
+      boardLibrary: [],
       isDirty: false,
     }),
   loadDesign: (design) => {
     const standoffsParse = parseStandoffsText(design.standoffsText);
     const cutoutsParse = parseCutoutsText(design.cutoutsText);
     const textLabelsParse = parseTextLabelsText(design.textLabelsText);
+    // Boards are optional in the file: designs saved before the feature
+    // existed have neither field, and must still load.
+    const boardsParse = parseBoardsText(design.boardsText ?? DEFAULT_BOARDS_TEXT);
     set({
       designName: design.designName,
       // Merge with DEFAULT_APPEARANCE so older JSONs (saved before a field
@@ -663,6 +709,10 @@ export const useDesign = create<DesignState>((set) => ({
       textLabelsText: design.textLabelsText,
       textLabels: textLabelsParse.labels,
       textLabelErrors: textLabelsParse.errors,
+      boardsText: design.boardsText ?? DEFAULT_BOARDS_TEXT,
+      boards: boardsParse.placements,
+      boardErrors: boardsParse.errors,
+      boardLibrary: design.boardLibrary ?? [],
       isDirty: false,
     });
   },

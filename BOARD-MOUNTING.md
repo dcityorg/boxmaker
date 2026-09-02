@@ -461,11 +461,23 @@ Phase 0 complete -- commit `126be43`.
 - [x] Rotation restricted to quarter turns, enforced in both the parser and the compiler.
 - [x] Connector cutouts through side walls (`[edges]`), pulled forward from phase 2 at
       Gary's request -- he has a box needing them now.
-- [ ] Board library: file import, embedded by value in the design. Built-in boards are
+- [x] Board library: file import, embedded by value in the design. Built-in boards are
       **deferred** by Gary's call; the library ships empty.
-- [ ] `boardsText` textarea wired into the store, new sidebar group and colour.
-- [ ] Merge compiled output into the geometry inputs (`effectiveStandoffs` /
-      `effectiveCutouts`).
+- [x] `boardsText` wired into the store, undo, autosave and the design file, plus a new
+      sidebar group in teal.
+- [x] Merge compiled output into the geometry inputs -- `effectiveFeatures()` in
+      `src/board/compileAll.ts` is the single place the user's own standoffs and cutouts
+      are combined with the board-generated ones. The viewport uses the memoised hook;
+      the STL and 3MF exporters call the pure function on `getState()`.
+
+Phase 1 complete. Verified end to end in the app: the Air Quality Monitor's four
+hand-entered OLED standoffs and its display window were deleted and replaced by one
+imported board file plus one placement line, and the lid came out visually unchanged.
+
+One known difference, and it is the section 11 issue rather than a bug: the example's
+OLED group carries per-standoff base fillets of `2, 1.5, 1.5, 2`, hand-reduced on the two
+near a wall. A board emits one fillet for the whole group, so those two are currently 2.
+The auto-clamp is phase 2.
 - [ ] Ghost board preview, plus keepout slabs.
 - [ ] `boardWarnings()` and its viewport ghosts.
 - [ ] "Explode to raw lines" escape hatch.

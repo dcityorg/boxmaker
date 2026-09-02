@@ -92,6 +92,8 @@ export function useAutoSave() {
             standoffsText: s.standoffsText,
             cutoutsText: s.cutoutsText,
             textLabelsText: s.textLabelsText,
+            boardsText: s.boardsText,
+            boardLibrary: s.boardLibrary,
             customFont: null, // intentionally omitted -- per-session only
           });
           localStorage.setItem(LS_KEY, JSON.stringify(file));

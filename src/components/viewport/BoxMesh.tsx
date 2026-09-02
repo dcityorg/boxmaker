@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { Edges } from '@react-three/drei';
 import { useDesign } from '@/store/useDesign';
+import { useEffectiveFeatures } from '@/board/compileAll';
 import { buildBox } from '@/geometry/box';
 import { buildBoxSeparateText } from '@/geometry/text';
 import { manifoldToThree } from '@/geometry/mesh';
@@ -20,8 +21,8 @@ export function BoxMesh() {
   const box = useDesign((s) => s.box);
   const lid = useDesign((s) => s.lid);
   const snap = useDesign((s) => s.snap);
-  const standoffs = useDesign((s) => s.standoffs);
-  const cutouts = useDesign((s) => s.cutouts);
+  // What the user typed PLUS what any placed boards compile to.
+  const { standoffs, cutouts } = useEffectiveFeatures();
   const textLabels = useDesign((s) => s.textLabels);
   const color = useDesign((s) => s.appearance.boxColor);
   const view = useDesign((s) => s.appearance.view);

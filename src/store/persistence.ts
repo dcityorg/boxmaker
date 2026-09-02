@@ -6,6 +6,7 @@ import type {
   LidParams,
   SnapFitParams,
 } from './useDesign';
+import type { BoardDefinition } from '@/board/types';
 
 /**
  * Persisted design file format. Bump VERSION + handle the old shape in
@@ -27,6 +28,18 @@ export interface DesignFile {
   standoffsText: string;
   cutoutsText: string;
   textLabelsText: string;
+  /**
+   * Boards are OPTIONAL and the file version is deliberately NOT bumped for
+   * them. parseDesignFile hard-rejects a version mismatch, so bumping would
+   * invalidate every design file and share link already in the wild -- as the
+   * v0.9.0 coordinate-frame change did once. An absent field just means a
+   * design saved before boards existed.
+   *
+   * The library is stored BY VALUE, not by reference to a file on disk, so a
+   * design always renders standalone.
+   */
+  boardsText?: string;
+  boardLibrary?: BoardDefinition[];
   customFont?: {
     name: string;
     /** Base64-encoded TTF/OTF bytes. */
@@ -80,6 +93,18 @@ export function buildDesignFile(args: {
   standoffsText: string;
   cutoutsText: string;
   textLabelsText: string;
+  /**
+   * Boards are OPTIONAL and the file version is deliberately NOT bumped for
+   * them. parseDesignFile hard-rejects a version mismatch, so bumping would
+   * invalidate every design file and share link already in the wild -- as the
+   * v0.9.0 coordinate-frame change did once. An absent field just means a
+   * design saved before boards existed.
+   *
+   * The library is stored BY VALUE, not by reference to a file on disk, so a
+   * design always renders standalone.
+   */
+  boardsText?: string;
+  boardLibrary?: BoardDefinition[];
   customFont?: { name: string; buffer: ArrayBuffer } | null;
 }): DesignFile {
   const file: DesignFile = {
@@ -93,6 +118,10 @@ export function buildDesignFile(args: {
     cutoutsText: args.cutoutsText,
     textLabelsText: args.textLabelsText,
   };
+  // Omit the board fields entirely when unused, so files from designs without
+  // boards stay byte-identical to what earlier versions produced.
+  if (args.boardsText) file.boardsText = args.boardsText;
+  if (args.boardLibrary && args.boardLibrary.length > 0) file.boardLibrary = args.boardLibrary;
   if (args.customFont) {
     file.customFont = {
       name: args.customFont.name,
