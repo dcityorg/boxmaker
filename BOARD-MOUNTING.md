@@ -320,12 +320,22 @@ itself new work.
 
 ## 10. Two hazards found in the existing code
 
-1. **Latent coplanar bug.** `standoffs.ts:138-140` and `:183-185` build a hole whose top
-   face is *exactly* coplanar with the standoff's free end when `holeDepth == height`, with
-   no epsilon applied. It survives today -- the curved side wall gives the boolean
-   something to bite on -- but a board-driven flush pocket, or a `holeDepth == height`
-   default, sits right on the failure mode documented at `snap.ts:219-256`. Apply the
-   0.01 mm break.
+1. **Coplanar standoff hole -- TESTED, not a bug. Hardened anyway.** The standoff screw
+   hole is drilled from the free end, so the cutter's end face is *always* coplanar with
+   the standoff's free end face -- for every standoff with a hole, not only when
+   `holeDepth == height` as first written here. That is the condition `snap.ts:219-256`
+   warns about.
+
+   Measured rather than assumed: two standoffs, one with `HoleDepth == Height` and one
+   with `HoleDepth < Height`, viewed from directly above with the epsilon at `0` and then
+   at `0.01`, full page reload between. **Both bores render open either way.** Manifold
+   copes; there was no bug.
+
+   The 0.01 mm break was kept regardless -- `snap.ts` leaves a standing instruction to
+   break coplanarity on any subtracted feature, it costs nothing, and boards are about to
+   generate standoffs in bulk. It is applied past the **free end only**, where there is no
+   material, so the resulting solid is unchanged and the drilled depth is still exactly
+   `HoleDepth`.
 
 2. **No debounce, no worker.** `BoxMesh.tsx:35-75` and `LidMesh.tsx:36-75` each do a full
    CSG rebuild of *both* bodies on every keystroke, because the parsers hand back fresh
@@ -382,11 +392,13 @@ per-section `useMemo`s concatenating separately.
 Deliberately minimal. The frame-math consolidation was considered and **rejected** --
 see section 9.
 
-- [ ] Apply the 0.01 mm coplanar break to the standoff hole top face (section 10.1).
-      Test: `floor,20,20,6,8,3,8,0` (HoleDepth == Height), then look straight down at the
-      post. A sealed disc means the bug is present; a visible hole means it is fixed.
-- [ ] Fix the stale v0.7.0 doc comments at `useDesign.ts:62-70` and `:99-107`, which still
-      describe the pre-v0.9 corners. Comments only, no behaviour change.
+- [x] Apply the 0.01 mm coplanar break to the standoff free end (section 10.1).
+      Verified by A/B with the epsilon at 0 and 0.01: no visible difference, because the
+      bug it guards against does not currently occur. Kept as hardening.
+- [x] Fix the stale v0.7.0 doc comments at `useDesign.ts:62-70` and `:99-107`, which still
+      described the pre-v0.9 corners *and* the walls as viewed from outside. Comments only.
+
+Phase 0 complete -- commit `126be43`.
 
 ### Phase 1 -- boards on the floor and lid
 
