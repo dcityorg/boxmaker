@@ -9,6 +9,9 @@
   --border-color: #2a2a2a;
   --text-primary: #e5e5e5;
   --text-secondary: #999;
+  /* Deliberately dimmer than --text-secondary: a placeholder is an example,
+     not content, and at the browser default it reads as a filled-in field. */
+  --text-placeholder: #4d4d4d;
   --accent: #6d9fff;
   --accent-hover: #5a8ae6;
 }
@@ -33,6 +36,17 @@ body {
 }
 .sidebar-scroll::-webkit-scrollbar-thumb:hover {
   background: #444;
+}
+
+/* Browser-default placeholders sit around 54% of the text colour, which on this
+   dark panel is bright enough to look like real content in an empty textarea.
+   Dim it and slant it so an example is unmistakably an example. `opacity: 1`
+   because Firefox dims placeholders on top of the colour. */
+textarea::placeholder,
+input::placeholder {
+  color: var(--text-placeholder);
+  font-style: italic;
+  opacity: 1;
 }
 
 input[type="range"]:focus {

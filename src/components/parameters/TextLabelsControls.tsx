@@ -80,7 +80,11 @@ export function TextLabelsControls() {
       titleColor={GROUP_COLORS.text}
       tooltip="Embossed (raised) or debossed (recessed) text on any surface. Separate-body labels become multi-material objects in the 3MF export."
     >
-      <div className="text-[10px] text-[var(--text-secondary)] italic mb-2 leading-snug">
+      <details className="mb-2">
+        <summary className="text-[10px] text-[var(--text-secondary)] cursor-pointer select-none hover:text-[var(--text-primary)]">
+          Text label format
+        </summary>
+        <div className="text-[10px] text-[var(--text-secondary)] italic mt-1 leading-snug">
         <div>
           Format: <code className="not-italic">
             Surface,​X,​Y,​Type,​Depth,​Height,​Direction,​Font,​Bold,​SeparateBody,​Text
@@ -103,6 +107,7 @@ export function TextLabelsControls() {
           Use <code className="not-italic">{'//'}</code> for comments
         </div>
       </div>
+      </details>
 
       <div className="flex items-center gap-2 mb-2">
         <button

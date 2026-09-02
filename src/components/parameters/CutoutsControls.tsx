@@ -22,7 +22,11 @@ export function CutoutsControls() {
       titleColor={GROUP_COLORS.cutouts}
       tooltip="Holes through any wall, floor, or the lid. Round (5 fields) or rectangular with optional corner fillet (7 fields)."
     >
-      <div className="text-[10px] text-[var(--text-secondary)] italic mb-2 leading-snug">
+      <details className="mb-2">
+        <summary className="text-[10px] text-[var(--text-secondary)] cursor-pointer select-none hover:text-[var(--text-primary)]">
+          Cutout format
+        </summary>
+        <div className="text-[10px] text-[var(--text-secondary)] italic mt-1 leading-snug">
         <div>
           Format Round: <code className="not-italic">Surface,​Round,​X,​Y,​Diameter</code>
         </div>
@@ -38,6 +42,7 @@ export function CutoutsControls() {
           Use <code className="not-italic">{'//'}</code> for comments
         </div>
       </div>
+      </details>
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}

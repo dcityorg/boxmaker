@@ -25,7 +25,11 @@ export function StandoffsControls() {
       titleColor={GROUP_COLORS.standoffs}
       tooltip="PCB-mount cylinders rising from the floor (or hanging from the lid). Optional concentric screw hole and base fillet per standoff."
     >
-      <div className="text-[10px] text-[var(--text-secondary)] italic mb-2 leading-snug">
+      <details className="mb-2">
+        <summary className="text-[10px] text-[var(--text-secondary)] cursor-pointer select-none hover:text-[var(--text-primary)]">
+          Standoff format
+        </summary>
+        <div className="text-[10px] text-[var(--text-secondary)] italic mt-1 leading-snug">
         <div>
           Format: <code className="not-italic">Surface,​X,​Y,​OD,​Height,​HoleDia,​HoleDepth,​BaseFilletRadius</code>
         </div>
@@ -42,6 +46,7 @@ export function StandoffsControls() {
           Use <code className="not-italic">{'//'}</code> for comments
         </div>
       </div>
+      </details>
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
