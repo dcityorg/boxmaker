@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "check:board": "tsc -p tsconfig.check.json && node node_modules/.cache/board-check/board/__acceptance.js"
   },
   "dependencies": {
     "@react-three/drei": "^9.122.0",

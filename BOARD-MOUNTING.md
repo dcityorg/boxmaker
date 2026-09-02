@@ -122,6 +122,25 @@ The result lands in the target surface's existing user frame, so it is passed st
 `floorAnchorXY` / `lidAnchorXY` in `geometry/standoffs.ts:68-97`. No new world-space math
 is written, and the lid's mirrored `+X` is already handled there. See section 9.
 
+**Rotation constraint on rectangular cutouts.** An earlier draft of this doc claimed
+arbitrary rotation was free because "cutouts are already arbitrary prisms". That is wrong
+for rects: `CutoutParams` rects are axis-aligned in the surface frame and carry no
+rotation of their own (`useDesign.ts`, and `cutoutCrossSection` in `cutouts.ts:19-42`).
+
+So, as built:
+
+| Feature | Rotation allowed |
+|---|---|
+| standoffs | any angle |
+| round cutouts | any angle |
+| rect cutouts | 0 / 90 / 180 / 270 only -- 90 and 270 swap the two dimensions |
+
+A board at a non-orthogonal angle still compiles its standoffs and round cutouts; only its
+rect cutouts are rejected, with an error naming the angle. Lifting the restriction means
+adding an optional `rotation` to `CutoutParams` and one `CrossSection.rotate` call in
+`geometry/cutouts.ts` -- additive and small, but it touches proven geometry, so it is not
+being done unasked.
+
 ### 3.4 Worked example: the Air Quality Monitor's OLED
 
 The case that is always confusing, done end to end. From
@@ -402,12 +421,16 @@ Phase 0 complete -- commit `126be43`.
 
 ### Phase 1 -- boards on the floor and lid
 
-- [ ] `.board.txt` parser, with `[edges]` reserved but unimplemented.
+- [x] `.board.txt` parser (`src/board/parseBoard.ts`), `[edges]` reserved and rejected.
+- [x] Placement parser (`src/board/parsePlacements.ts`), `Components up|down`.
+- [x] Compile to standoffs and to top/bottom cutouts (`src/board/compile.ts`), including
+      the floor/lid frame conversion for a feature that cuts the far surface.
+- [x] Acceptance check (`src/board/__acceptance.ts`, `npm run check:board`) -- 33 checks,
+      headed by reproducing the Air Quality OLED standoffs exactly. All passing.
 - [ ] Board library: built-ins plus file import, embedded by value in the design.
-- [ ] `boardsText` placement textarea, new sidebar group and colour.
-- [ ] Compile to standoffs and to top/bottom cutouts.
-- [ ] Arbitrary rotation angle (cheap -- cutouts are already arbitrary prisms).
-- [ ] `Components up|down`, with the derived mirror rule documented in the Help panel.
+- [ ] `boardsText` textarea wired into the store, new sidebar group and colour.
+- [ ] Rotation: any angle for standoffs and round cutouts; rects restricted to quarter
+      turns (see section 3.3).
 - [ ] Ghost board preview, plus keepout slabs.
 - [ ] `boardWarnings()` and its viewport ghosts.
 - [ ] "Explode to raw lines" escape hatch.
@@ -456,6 +479,9 @@ top/bottom cutouts remain valid at any angle.
 
 ## 15. Verification
 
+0. `npm run check:board` -- the compiler acceptance check. Covers items 2, 3, 5 and part
+   of 8 below without a browser. Runs `tsc -p tsconfig.check.json` then the emitted JS;
+   nothing imports `__acceptance.ts`, so it stays out of the app bundle.
 1. `npx tsc --noEmit`. Never `npm run build` while `npm run dev` is running -- they share
    `.next`. See `CLAUDE.md`.
 2. **Round trip:** define a board, place it at rotation 0 / `Components up` on the floor, click
