@@ -1,0 +1,465 @@
+# Board Mounting -- design document
+
+> Status: **proposal / under discussion.** Nothing implemented yet.
+> Companion to `PROJECT-BRIEF.md`. Written 2026-09-01 against v0.9.3.
+
+---
+
+## 1. Why
+
+Most BoxMaker enclosures house electronics on PC boards. Today, mounting a board means
+hand-entering one standoff line per mounting hole, with coordinates measured off the box
+floor rather than off the board.
+
+`docs/examples/air-quality-monitor.boxmaker.json` is the evidence: 16 hand-entered
+standoffs in four `//`-commented groups, one group per board --
+
+```
+// micro board
+floor,10.1,47.6,5,8,2.6,7,2.5      (x4)
+// air qual sensor
+floor,86.1,50.8,5,8,2.6,7,2        (x4)
+// sensor
+lid,9.3,27.5,5,3.9,2.2,4.2,2.5     (x4)
+// oled
+lid, 10.1, 63.1, 4, 2.6, 2.2, 3.2, 2   (x4)
+```
+
+Three problems:
+
+1. **No reuse.** Mount the same board in a second box and every number is re-derived.
+2. **No relocation.** Move the board 5 mm and every standoff line is re-typed by hand.
+3. **No link between a board and the holes its components need.** A display window or a
+   light-sensor aperture is positioned relative to the *board*, but must be entered in
+   *box* coordinates -- so the two silently drift apart.
+
+**Goal:** define a board once in its own reusable file (outline, mounting holes, the
+cutouts its components need), then place it in a box with a position, a rotation, a
+component-side direction and a surface -- and have BoxMaker emit the standoffs and cutouts.
+
+---
+
+## 2. The central decision: boards are a compiler, not a new geometry path
+
+A placed board **compiles to ordinary `StandoffParams[]` and `CutoutParams[]`**, which are
+concatenated onto the user's hand-entered ones before geometry, validation and ghost
+rendering consume them.
+
+This works because the existing primitives are already sufficient. Standoffs are
+`Surface,X,Y,OD,Height,HoleDia,HoleDepth,BaseFillet` on `floor` or `lid`; cutouts are
+`Surface,Round|Rect,...` and already support the floor, the lid, **and all four walls**.
+
+Consequences, all good:
+
+- **No new manifold code.** `geometry/standoffs.ts` and `geometry/cutouts.ts` untouched.
+- All of `validation/checks.ts` -- `standoffWarnings`, `cutoutWarnings`, bounds checks,
+  the pocket-aware standoff-hits-lid check -- applies to board features for free.
+- The red viewport ghosts in `viewport/WarningMarkers.tsx` work unchanged.
+- **Free escape hatch:** an "Explode to raw lines" button writes the compiled lines into
+  the Standoffs and Cutouts textareas and drops the board. This partly restores the
+  hand-tweak ability lost by dropping the Fusion add-in's Custom Modifications.
+
+So this is a coordinate-transform and code-generation feature, not a CAD feature. That is
+much smaller than it first looks.
+
+---
+
+## 3. Coordinate conventions
+
+The part that must be got right. Everything else is bookkeeping.
+
+### 3.1 Board-local frame
+
+Purely a property of the board. No reference to standoffs, boxes or mounting.
+
+- Origin `(0,0)` at a corner the user picks, **viewed from the component side**.
+- `+X` right, `+Y` up -- as you would read a mechanical drawing, so transcription from a
+  datasheet is mechanical.
+- `Z = 0` at the board's **non-component face**; `+Z` toward the component side.
+
+### 3.2 Which way do the components face? `up` / `down`, in world Z
+
+**Decision (2026-09-01): the placement line carries `Components, up|down`, not a
+`Flip yes/no` boolean.**
+
+A boolean forces the user to reason about mirroring, and the answer is counter-intuitive
+in exactly the common case. Worked through in section 3.4: an OLED mounted under the lid
+with its display facing up toward the lid window *is* the mirrored case, so a naive
+`Flip = no` is wrong. Nobody should have to derive that.
+
+`up` / `down` is world Z and matches how the case gets described out loud -- "component
+side facing up." The compiler derives everything else:
+
+**Mirror rule.** Board X mirrors when the component side faces the mounting surface:
+
+| Mounted on | Components | Board +X vs surface user +X |
+|---|---|---|
+| floor | up   | same |
+| floor | down | **mirrored** |
+| lid   | up   | **mirrored** |
+| lid   | down | same |
+
+Board +Y always maps to surface user +Y.
+
+**Cutout side resolution, in one line:** a `top` board feature cuts whatever surface is
+above it; a `bottom` feature cuts whatever is below. When components face `up`, board top
+is world up. That is the whole rule -- it does not depend on which surface the board is
+mounted to.
+
+- OLED on the lid, display is a `top` feature, components `up` -> cuts the **lid**.
+- Floor board, light sensor is a `bottom` feature, components `up` -> cuts the **floor**.
+- Floor board, status LED is a `top` feature, components `up` -> cuts the **lid**.
+
+### 3.3 Placement transform
+
+Board point `(bx, by)` maps to surface user coordinates in this order:
+
+1. **Mirror** `bx -> -bx` if the table in 3.2 says so.
+2. **Rotate** by `rot` degrees CCW about the board origin.
+3. **Translate** by the placement `(X, Y)`.
+
+The result lands in the target surface's existing user frame, so it is passed straight to
+`floorAnchorXY` / `lidAnchorXY` in `geometry/standoffs.ts:68-97`. No new world-space math
+is written, and the lid's mirrored `+X` is already handled there. See section 9.
+
+### 3.4 Worked example: the Air Quality Monitor's OLED
+
+The case that is always confusing, done end to end. From
+`docs/examples/air-quality-monitor.boxmaker.json`:
+
+```
+lid, 10.1, 63.1  |  lid, 101.7, 63.1  |  lid, 101.7, 38  |  lid, 10.1, 38
+   -> mounting pattern 91.6 x 25.1, standoff height 2.6, OD 4, hole 2.2
+lid, Rect, 58.1, 49, 79.6, 26.9, 0
+   -> display window spans user X 18.3 .. 97.9, Y 35.55 .. 62.45
+```
+
+The board is mounted under the lid with the **component side facing up**, so the display
+protrudes into the window. Say the board is ~96.6 x 30.1 with holes 2.5 mm in from each
+corner, i.e. board coordinates (2.5, 2.5), (94.1, 2.5), (94.1, 27.6), (2.5, 27.6).
+
+Mounted on `lid` with components `up` -> **mirrored** (section 3.2). So:
+
+```
+userX = X0 - bx        userY = Y0 + by
+
+X0 - 2.5  = 101.7  ->  X0 = 104.2
+X0 - 94.1 =  10.1  ->  X0 = 104.2     agree
+Y0 + 2.5  =  38.0  ->  Y0 =  35.5
+Y0 + 27.6 =  63.1  ->  Y0 =  35.5     agree
+```
+
+Both pairs solving independently to the same value is the check that the mapping is right.
+
+```
+lid, 104.2, 35.5, 0, up, 2.6, 4, 2.2, 3.2, 2, OLED
+```
+
+Note `X0 = 104.2` sits near the far end of lid `+X`. That is the mirror at work: the
+board's lower-left corner, seen from the component side, lands at **high** user X because
+lid `+X` runs the opposite way. Viewed from outside the box it still appears at the lower
+left, which is why the sketch looks right even though the number is large.
+
+## 4. File formats
+
+### 4.1 Board definition -- `*.board.txt`, sectioned plain text
+
+Recommended over JSON: it matches the app's existing comma-delimited editing model, it
+hand-edits and git-diffs cleanly, and its body lines reuse the existing per-line parsing.
+
+```
+// BoxMaker board definition
+
+[board]
+Name, Adafruit Feather ESP32-S3
+Size, 50.80, 22.86            // X, Y
+Thickness, 1.60
+CornerRadius, 1.5
+
+[mounts]                       // X, Y, BoardHoleDia
+2.54, 2.54, 2.5
+48.26, 2.54, 2.5
+2.54, 20.32, 2.5
+48.26, 20.32, 2.5
+
+[cutouts]                      // Side, Shape, X, Y, <shape args>, Clearance
+top,    Rect,  25.4, 11.4, 30, 15, 1, 0.4
+bottom, Round, 10.0,  5.0, 3.5, 0.3
+
+[edges]                        // RESERVED, phase 2 -- connector cutouts
+// Edge, X, Z, SizeX, SizeZ, CornerRadius, Clearance
+
+[keepouts]                     // OPTIONAL: X, Y, SizeX, SizeY, Height, Side
+0, 0, 50.8, 22.86, 8, top
+```
+
+Shape args mirror the existing cutout syntax exactly: `Round` takes `Diameter`, `Rect`
+takes `SizeX, SizeY, CornerRadius`.
+
+`[edges]` is reserved from day one so phase 2 is an addition, not a format break.
+
+**`[keepouts]` are "nothing else here" volumes** -- a box marking a tall component: an
+electrolytic cap, a USB connector, a pin header, the OLED module itself. Entirely
+optional, and they buy three things:
+
+- the ghost preview draws them, so you can see whether the board actually fits;
+- validation checks the tallest one against the lid, instead of assuming a bare PCB;
+- validation can catch a standoff or a wall landing where a component already is.
+
+Skip the section if measuring components is not worth the trouble; everything else still
+works.
+
+### 4.2 Placement -- a new `boardsText` textarea in the box design
+
+One line per placed board. Follows the `TextLabels` precedent of a free-text trailing
+field: the parser finds the Nth comma and takes the rest as the name
+(`useDesign.ts:223-241`).
+
+```
+// Surface, X, Y, Rotation, Components, StandoffHeight, StandoffOD, StandoffHoleDia, HoleDepth, BaseFillet, BoardName
+floor, 10,    12,   0, up, 6,   6, 2.6, 8,   1, Feather ESP32-S3
+lid,  104.2, 35.5,  0, up, 2.6, 4, 2.2, 3.2, 2, OLED
+```
+
+`Components` is `up` or `down` in world Z -- see section 3.2. Rotation is CCW degrees
+about the board origin.
+
+**Standoff dimensions live on the placement line, not in the board file.** How high you
+lift a board, and whether you use M2 or M3, is a property of *this box* -- not of the
+board. The board file carries only the board's own hole diameter, which validation uses to
+sanity-check the standoff OD.
+
+---
+
+## 5. Board library
+
+Same shape as the existing `src/data/presets.ts`:
+
+- `src/data/boards.ts` -- built-in boards imported at build time and run through the same
+  parser as a user file, so there is one validation path.
+- User boards imported through a hidden file input, following `Sidebar.tsx:179-215`.
+- **Boards are embedded by value in the saved design.** A `.boxmaker.json` must render
+  standalone; a by-reference library link would break the moment a file moved. Record the
+  source name so an "update from library" action stays possible later.
+
+Trade-off to accept: embedded board definitions enlarge the base64 share-link hash.
+
+---
+
+## 6. Persistence
+
+Add `boardsText` and `boards` to `DesignFile` as **optional** fields, and **do not bump
+`DESIGN_FILE_VERSION`.**
+
+`parseDesignFile` hard-rejects a version mismatch (`persistence.ts:121-125`), so bumping
+invalidates every saved file and share link in the wild -- as the v0.9.0 coordinate-frame
+change already did once. Optional fields plus the existing `{...DEFAULT_X, ...design.x}`
+merge in `loadDesign` give clean backward compatibility for free.
+
+---
+
+## 7. Validation
+
+New `boardWarnings()` in `validation/checks.ts`, reusing `interiorSpan`, `pocketSpan` and
+`boundsFit`. Its ghosts register in `collectGhosts()` (`checks.ts:588-602`), so the red
+viewport highlights come for free.
+
+Checks:
+
+- Board footprint, post-rotation, fits the interior (floor) or the pocket (lid).
+  Partial = advisory, fully outside = hard.
+- Board plus tallest keepout fits under the lid. The pocket-aware headroom math at
+  `checks.ts:297-322` is directly reusable.
+- Standoff OD vs the board's hole diameter.
+- Standoff too close to a board edge -- the standoff overhangs the board.
+- A compiled cutout falls outside its target surface.
+- Two placed boards overlap.
+
+Board-generated warnings need a **provenance tag** rather than a `line` number, so a
+message reads `board "Feather" mount 3` instead of pointing at a textarea row that does
+not contain it.
+
+---
+
+## 8. Ghost board preview
+
+New `src/components/viewport/BoardGhost.tsx`, mounted in `Viewport.tsx` right after
+`<WarningMarkers />` (`:290`).
+
+- Copy the `WarningMarkers.tsx` material recipe verbatim -- `transparent`,
+  `depthWrite={false}` (`:41-48`). That is what avoids sorting artifacts against the
+  solid box.
+- Use a plain three `boxGeometry` slab, **not** a manifold build, so dragging a placement
+  slider does not trigger a CSG rebuild.
+- Apply `lidAssembledOffset(box)` when `view === 'assembled'` and the board is
+  lid-mounted, exactly as `WarningMarkers.tsx:36-39` and `OriginMarkers.tsx:128` do.
+- Render `[keepouts]` as fainter slabs on top of the board.
+
+---
+
+## 9. Coordinate math: reuse, do not refactor
+
+**Decision (2026-09-01): no refactor.** The per-surface frame math took a long time to get
+right across two rounds (v0.7.0 wrong, v0.9.0 correct) and is not worth re-testing for
+this feature's convenience.
+
+`geometry/standoffs.ts` already exports `floorAnchorXY` (`:68-73`) and `lidAnchorXY`
+(`:86-97`). Board compiling **imports and calls those directly.** No existing file is
+modified, and boards inherit frames that are already proven.
+
+The known duplication stays as-is: `geometry/cutouts.ts:99-121`, `geometry/text.ts:473-496`,
+`validation/checks.ts:68-82` (whose comment says "Mirrors lidAnchorXY in
+geometry/standoffs.ts") and `viewport/OriginMarkers.tsx:40-149` each carry their own copy.
+It works. Consolidating it is a separate piece of work with its own justification.
+
+**If it is ever consolidated,** the safety net must be mechanical, not careful reading:
+export STL for both example designs before the change, export again after, and `cmp` the
+files. Byte-identical is proof. Note the project currently has **no test infrastructure at
+all** (`package.json` has only dev/build/start/lint, no test dir), so that harness is
+itself new work.
+
+## 10. Two hazards found in the existing code
+
+1. **Latent coplanar bug.** `standoffs.ts:138-140` and `:183-185` build a hole whose top
+   face is *exactly* coplanar with the standoff's free end when `holeDepth == height`, with
+   no epsilon applied. It survives today -- the curved side wall gives the boolean
+   something to bite on -- but a board-driven flush pocket, or a `holeDepth == height`
+   default, sits right on the failure mode documented at `snap.ts:219-256`. Apply the
+   0.01 mm break.
+
+2. **No debounce, no worker.** `BoxMesh.tsx:35-75` and `LidMesh.tsx:36-75` each do a full
+   CSG rebuild of *both* bodies on every keystroke, because the parsers hand back fresh
+   array identities per character (`useDesign.ts:600-611`). Boards do not make this
+   qualitatively worse -- standoffs are cheap -- but a board library that makes
+   16-standoff designs routine will make it more noticeable. Not this feature's job to
+   fix; worth knowing before blaming boards for it.
+
+---
+
+## 11. Per-standoff base fillet -- DECIDED: auto-clamp
+
+The Air Quality example shows this being hand-tuned: its "air qual sensor" group is
+`2, 1, 1, 2` -- fillet reduced on the two standoffs near a wall, full radius on the other
+two. A single fillet value per board could not reproduce that.
+
+**Decision (2026-09-01): auto-clamp each emitted fillet to the wall clearance at that
+standoff's position.** The geometry already clamps to `min(baseFillet, r - 0.05, h - 0.05)`
+at `standoffs.ts:27`; this adds one more term. A user who dislikes the clamp can simply
+specify a smaller fillet for the whole board.
+
+**Emit an advisory warning whenever the clamp actually fires,** so the change is visible
+rather than silent.
+
+## 12. Files to touch
+
+| File | Change |
+|---|---|
+| `src/board/parseBoard.ts` | **new** -- `.board.txt` section parser |
+| `src/board/compile.ts` | **new** -- placement + board -> standoffs / cutouts; imports `floorAnchorXY` / `lidAnchorXY` from `geometry/standoffs.ts` |
+| `src/data/boards.ts` | **new** -- built-in board library |
+| `src/components/parameters/BoardsControls.tsx` | **new** -- copy the `StandoffsControls.tsx` template |
+| `src/components/viewport/BoardGhost.tsx` | **new** -- semi-transparent preview |
+| `src/store/useDesign.ts` | `boardsText`, `parseBoardsText()`, `BoardPlacement`, setter |
+| `src/store/persistence.ts` | optional `boardsText` / `boards` in `DesignFile` |
+| `src/store/useUndoRedo.ts` | add fields to `Snapshot`, `snapshotEquals`, `apply` (`:11-46`, `:90-119`) -- **all four places, or undo silently drops them** |
+| `src/store/useAutoSave.ts` | include the new fields (`:86-92`) |
+| `src/components/editor/Sidebar.tsx` | new group, import button, save/load wiring |
+| `src/config/colors.ts` | 6th entry in `GROUP_COLORS` |
+| `src/validation/checks.ts` | `boardWarnings()` + register ghosts |
+| `src/components/editor/HelpPanel.tsx` | new `HELP_SECTIONS` entry -- the single source of truth for user-facing semantics |
+| `VALIDATION-TESTS.md` | recipes for each new warning |
+
+The compiled features should be consumed through a single derived `effectiveStandoffs` /
+`effectiveCutouts` in the store, rather than each of geometry, `collectGhosts` and the
+per-section `useMemo`s concatenating separately.
+
+---
+
+## 13. Phases
+
+### Phase 0 -- small fixes, no refactor
+
+Deliberately minimal. The frame-math consolidation was considered and **rejected** --
+see section 9.
+
+- [ ] Apply the 0.01 mm coplanar break to the standoff hole top face (section 10.1).
+      Test: `floor,20,20,6,8,3,8,0` (HoleDepth == Height), then look straight down at the
+      post. A sealed disc means the bug is present; a visible hole means it is fixed.
+- [ ] Fix the stale v0.7.0 doc comments at `useDesign.ts:62-70` and `:99-107`, which still
+      describe the pre-v0.9 corners. Comments only, no behaviour change.
+
+### Phase 1 -- boards on the floor and lid
+
+- [ ] `.board.txt` parser, with `[edges]` reserved but unimplemented.
+- [ ] Board library: built-ins plus file import, embedded by value in the design.
+- [ ] `boardsText` placement textarea, new sidebar group and colour.
+- [ ] Compile to standoffs and to top/bottom cutouts.
+- [ ] Arbitrary rotation angle (cheap -- cutouts are already arbitrary prisms).
+- [ ] `Components up|down`, with the derived mirror rule documented in the Help panel.
+- [ ] Ghost board preview, plus keepout slabs.
+- [ ] `boardWarnings()` and its viewport ghosts.
+- [ ] "Explode to raw lines" escape hatch.
+- [ ] Help panel section; persistence, undo and autosave wiring.
+
+### Phase 2 -- edge / connector cutouts
+
+Most real boards have a USB jack, barrel connector or header on an **edge**, needing a
+rectangular hole through a side wall. This is arguably the difference between "the board
+mounts" and "the box is finished."
+
+The wall cutout frames already exist (`cutouts.ts:123-175`): X runs along the wall viewed
+from inside, Y is height above the interior floor. So this still compiles to existing
+primitives.
+
+**Constraint:** a board edge only faces a wall squarely at 0 / 90 / 180 / 270 degrees.
+Edge cutouts must be rejected with a warning at other angles, even though standoffs and
+top/bottom cutouts remain valid at any angle.
+
+- [ ] `[edges]` section parsing.
+- [ ] Edge -> wall resolution through the placement rotation.
+- [ ] Warning when a board with edge features is placed at a non-orthogonal angle.
+- [ ] Warning when a projected connector cutout misses its wall or crosses a corner.
+
+---
+
+## 14. Future add-ons (not scheduled)
+
+- **Non-rectangular board outlines.** Pi HATs have notches. Phase 1 is rectangle plus
+  corner radius; a polygon outline section can be added without breaking the format.
+- **"Fit box to boards."** Once footprints and heights are known, BoxMaker can size the
+  interior to the placed boards plus a margin. Strong feature; entirely separate change.
+- **Drill-template export.** A thin plate carrying just the standoff pattern, to test-fit
+  a real board before committing to a full box print. The 3MF plumbing is already n-body
+  (`Sidebar.tsx:256-261`), so this is mostly UI.
+- **Board name engraving** near each standoff group, reusing the text-label machinery.
+- **Per-mount standoff overrides** -- skip a hole, or vary one standoff's height.
+- **Card-edge slots** -- board slides into slots moulded into two opposite walls, no
+  standoffs at all.
+- **Standoff top variants** -- integral peg through the board hole instead of a screw, or
+  a snap post.
+- **Board thumbnails** in the library picker, matching VaseMaker's preset thumbnails.
+- **Multi-board stacking** -- a board mounted on standoffs rising from another board.
+
+---
+
+## 15. Verification
+
+1. `npx tsc --noEmit`. Never `npm run build` while `npm run dev` is running -- they share
+   `.next`. See `CLAUDE.md`.
+2. **Round trip:** define a board, place it at rotation 0 / `Components up` on the floor, click
+   "Explode to raw lines", and confirm the emitted standoff lines match hand-derived
+   values.
+3. **Transform matrix:** repeat at 90 / 180 / 270 and with `Components down`, checking exploded
+   lines against hand-computed coordinates each time. This is where the transform-order
+   bugs will be.
+4. **Lid mirror:** place the same board on the lid, confirm the mirrored `+X` lands
+   correctly, export the lid STL and measure.
+5. **Side resolution:** a board with a `top` cutout on the floor with `Components up` must
+   cut the **lid**; the same board with `Components down` must cut the **floor**.
+   The section 3.4 OLED must reproduce the example's four standoffs exactly.
+6. **Backward compatibility:** load a pre-board `.boxmaker.json` and an old share link --
+   both must still work.
+7. **Undo/redo** across a board edit, a placement edit and a board import.
+8. Reproduce the Air Quality Monitor's four board groups as four placed boards, and diff
+   the exploded standoff lines against the hand-entered originals. That example is the
+   real acceptance test.
