@@ -7,6 +7,9 @@ import { useDesign } from '@/store/useDesign';
 import { parseBoardFile } from '@/board/parseBoard';
 import { useEffectiveFeatures } from '@/board/compileAll';
 
+/** An alert longer than this is unreadable; the rest is almost always noise. */
+const MAX_ERRORS_SHOWN = 10;
+
 export function BoardsControls() {
   const text = useDesign((s) => s.boardsText);
   const setText = useDesign((s) => s.setBoardsText);
@@ -26,11 +29,17 @@ export function BoardsControls() {
     try {
       const { board, errors: parseErrors } = parseBoardFile(await file.text());
       if (!board) {
+        const shown = parseErrors
+          .slice(0, MAX_ERRORS_SHOWN)
+          .map((p) => (p.line > 0 ? `line ${p.line}: ${p.reason}` : p.reason));
+        const extra = parseErrors.length - shown.length;
+        if (extra > 0) shown.push(`... and ${extra} more`);
         alert(
-          `Could not read ${file.name}:\n\n` +
-            parseErrors
-              .map((p) => (p.line > 0 ? `line ${p.line}: ${p.reason}` : p.reason))
-              .join('\n')
+          `Could not read ${file.name}:\n\n${shown.join('\n')}` +
+            (parseErrors.length > MAX_ERRORS_SHOWN
+              ? '\n\nThat many errors usually means this is not a board file, or ' +
+                'was saved as rich text rather than plain text.'
+              : '')
         );
         return;
       }
@@ -51,17 +60,19 @@ export function BoardsControls() {
       <button
         onClick={() => fileInputRef.current?.click()}
         className="w-full px-2 py-1 mb-2 text-xs bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded hover:bg-[var(--border-color)] transition-colors text-[var(--text-secondary)]"
-        title="Import a .board.txt board definition. It is stored inside this design, so the design still renders on a machine that does not have the file."
+        title="Import a board definition file. Re-importing a board with the same name replaces it, so you can edit the file and import again without deleting it first. The definition is stored inside this design, so the design still renders on a machine that does not have the file."
       >
         + Import board file
       </button>
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".txt,text/plain"
-        onChange={handleImport}
-        className="hidden"
-      />
+      {/*
+        No `accept` filter, deliberately. macOS greys out anything the filter
+        does not match, with no explanation -- so a board file saved as
+        `.board`, or as `.rtf` by TextEdit, simply cannot be picked and the user
+        is left guessing. A board file is just text; the parser validates the
+        contents and says exactly what is wrong, which is a far better failure
+        than an unclickable filename.
+      */}
+      <input ref={fileInputRef} type="file" onChange={handleImport} className="hidden" />
 
       {/* ---- board file format ------------------------------------------ */}
       <details className="mb-2">
