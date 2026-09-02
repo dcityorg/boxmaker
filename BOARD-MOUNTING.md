@@ -404,19 +404,45 @@ itself new work.
 
 ---
 
-## 11. Per-standoff base fillet -- DECIDED: auto-clamp
+## 11. Per-standoff base fillet -- auto-clamp REJECTED, warning added instead
 
-The Air Quality example shows this being hand-tuned: its "air qual sensor" group is
-`2, 1, 1, 2` -- fillet reduced on the two standoffs near a wall, full radius on the other
-two. A single fillet value per board could not reproduce that.
+The Air Quality example hand-tunes this: its "air qual sensor" group is `2, 1, 1, 2`, the
+fillet reduced on the two standoffs nearest a wall. A board emits one fillet for the whole
+group, so on 2026-09-01 the decision here was to auto-clamp each emitted fillet to the wall
+clearance.
 
-**Decision (2026-09-01): auto-clamp each emitted fillet to the wall clearance at that
-standoff's position.** The geometry already clamps to `min(baseFillet, r - 0.05, h - 0.05)`
-at `standoffs.ts:27`; this adds one more term. A user who dislikes the clamp can simply
-specify a smaller fillet for the whole board.
+**Reversed on 2026-09-02, on evidence.** Gary produced two cases where an oversized fillet
+is harmless, and testing found a third where it is not -- and the third is not what the
+clamp was aimed at.
 
-**Emit an advisory warning whenever the clamp actually fires,** so the change is visible
-rather than silent.
+What actually happens when a fillet is too big:
+
+| Case | Result |
+|---|---|
+| Fillet overlaps a **cutout** | Fine. Cutouts are subtracted after standoffs (`box.ts:136-146`), so the cutout simply trims it. |
+| Fillet **reaches the wall** | Fine. It unions into the wall as a small gusset. |
+| Fillet overlaps another standoff | Fine. They merge. |
+| Fillet drives **clean through** the wall | **Defect** -- a lens-shaped bump on the OUTSIDE of the box. |
+
+So the premise was wrong. The clamp would have silently reduced fillets in cases that print
+perfectly well, and would have changed geometry the user was happy with. It is not built.
+
+The real gap is narrower and was entirely unguarded: `boundsFit` in `standoffWarnings`
+tests `s.x +/- od/2` and **ignores the fillet completely**, so a standoff whose body sits
+comfortably inside the interior can still push its fillet out through the exterior face
+with no warning at all. Confirmed in the app: `floor,113,41,12,10,0,0,5` in a
+125 x 82 box with 2.5 mm walls raises a visible exterior bump and produced zero warnings.
+
+**Shipped instead:** an advisory in `standoffWarnings` for floor standoffs, firing only
+when `od/2 + fillet` exceeds the distance to the interior wall face by more than
+`wallThickness`. It reports the overshoot in mm and ghosts the fillet skirt in red. The
+example above now reads "breaks through the outside of the wall by 1.5 mm", which matches
+the arithmetic by hand.
+
+Consequence for boards: a board still emits one fillet for its whole group, so the Air
+Quality OLED group compiles to four fillets of 2 rather than `2, 1.5, 1.5, 2`. That is now
+understood to be a cosmetic difference and not a defect -- none of those four breaks
+through, and the real design raises no warnings.
 
 ## 12. Files to touch
 
@@ -500,7 +526,8 @@ board does not fit.
 - [ ] Ghost board preview and keepout slabs (section 8).
 - [ ] Warning when a projected connector cutout misses its wall or crosses a corner.
 - [ ] Warning when a compiled cutout falls outside its target surface.
-- [ ] Auto-clamp standoff base fillets to wall clearance, with an advisory (section 11).
+- [x] Fillet handling settled -- auto-clamp rejected, exterior-breakthrough advisory
+      shipped instead (section 11).
 - [ ] "Explode to raw lines" escape hatch.
 - [ ] Help panel section -- the single source of truth for user-facing semantics.
 

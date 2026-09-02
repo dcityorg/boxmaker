@@ -284,6 +284,34 @@ export function standoffWarnings(
     }
 
     if (s.surface === 'floor') {
+      // The fillet skirt is NOT part of the footprint boundsFit tests above --
+      // that uses od/2 only. So a standoff whose body sits comfortably inside
+      // the interior can still drive its fillet clean through a wall and raise
+      // a bump on the OUTSIDE of the box, with nothing else here saying a word.
+      //
+      // Note a fillet merely REACHING the wall, or overlapping a cutout or
+      // another standoff, is fine: it unions into the wall as a small gusset,
+      // and cutouts are subtracted after standoffs so they trim it. Only
+      // emerging through the far face of the wall is a defect.
+      const f = Math.min(s.baseFillet, r - 0.05, s.height - 0.05);
+      if (f > 0) {
+        const reach = r + f;
+        const through = Math.max(
+          reach - s.x,                  // out through the left wall
+          reach - (interior.x - s.x),   // ... the right
+          reach - s.y,                  // ... the front
+          reach - (interior.y - s.y)    // ... the back
+        ) - box.wallThickness;
+        if (through > EPS) {
+          warnings.push({
+            severity: 'advisory',
+            line,
+            message: `The base fillet breaks through the outside of the wall by ${fmt(through)} mm -- it will print as a bump on the exterior. Reduce BaseFilletRadius or move the standoff inward.`,
+            ghost: filletGhost(box, s, reach),
+          });
+        }
+      }
+
       if (s.holeDia > 0 && s.holeDepth > s.height + box.floorThickness) {
         warnings.push({
           severity: 'advisory',
@@ -352,6 +380,20 @@ export function standoffWarnings(
     }
   }
   return warnings;
+}
+
+/** Red disc over just the fillet skirt at a floor standoff's base. */
+function filletGhost(box: BoxParams, s: StandoffParams, reach: number): WarningGhost {
+  const { wx, wy } = floorToWorld(box, s.x, s.y);
+  const f = Math.min(s.baseFillet, s.od / 2 - 0.05, s.height - 0.05);
+  return {
+    kind: 'cylinder',
+    frame: 'box',
+    pos: [wx, wy, box.floorThickness + f / 2],
+    axis: 'z',
+    radius: reach + GHOST_WRAP,
+    length: f + 2 * GHOST_WRAP,
+  };
 }
 
 /** Red overlay wrapping a whole standoff (used for off-surface warnings). */
