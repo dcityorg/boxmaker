@@ -106,7 +106,12 @@ export function compileBoard(
       y,
       width,
       height,
-      cornerRadius: Math.max(0, c.cornerRadius + c.clearance),
+      // Clearance changes SIZE only, never the corner radius. A true outward
+      // offset would round a sharp corner by the offset distance, but someone
+      // who typed CornerRadius 0 means square corners -- getting a radius they
+      // did not ask for is astonishing, and for a display window it is wrong.
+      // The radius is whatever they asked for.
+      cornerRadius: Math.max(0, c.cornerRadius),
     });
   }
 
@@ -132,7 +137,8 @@ export function compileBoard(
       y: boardZToWorldZ(placement, board, e.z, box) - box.floorThickness,
       width,
       height,
-      cornerRadius: Math.max(0, e.cornerRadius + e.clearance),
+      // Size only -- see the note on component cutouts above.
+      cornerRadius: Math.max(0, e.cornerRadius),
     });
   }
 

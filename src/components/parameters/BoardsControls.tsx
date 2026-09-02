@@ -203,7 +203,8 @@ export function BoardsControls() {
           </div>
           <div>
             Clearance is added on EVERY side, so the opening grows by twice it: 10 wide with
-            Clearance 0.4 cuts as 10.8.
+            Clearance 0.4 cuts as 10.8. It changes SIZE only — CornerRadius stays exactly what
+            you asked for, so 0 stays square.
           </div>
         </div>
       </details>
@@ -233,7 +234,9 @@ export function BoardsControls() {
                 title={
                   hasHandle(b.name)
                     ? `Re-read ${b.name} from the file it was imported from`
-                    : `Re-import ${b.name} -- the file has to be picked again, because the page was reloaded since it was imported`
+                    : supportsFilePicker()
+                      ? `Re-import ${b.name} -- the file has to be picked again, because the page was reloaded since it was imported`
+                      : `Re-import ${b.name} -- this browser cannot re-read a file directly, so it will always ask for the file`
                 }
               >
                 <RefreshCw size={11} />

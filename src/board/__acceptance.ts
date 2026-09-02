@@ -184,10 +184,19 @@ const conn = rigOut.cutouts[0];
 check('cuts the FRONT wall', conn.surface === 'front', `got ${conn.surface}`);
 check('along the wall at 85', near(conn.x, 85, 1e-9), `got ${conn.x}`);
 check('9.1 above the interior floor', near(conn.y, 9.1, 1e-9), `got ${conn.y}`);
-check('grown by clearance to 9.8 x 4.3, radius 0.9',
+check('grown by clearance to 9.8 x 4.3',
   conn.kind === 'rect' && near((conn as { width: number }).width, 9.8, 1e-9) &&
-  near((conn as { height: number }).height, 4.3, 1e-9) &&
-  near((conn as { cornerRadius: number }).cornerRadius, 0.9, 1e-9));
+  near((conn as { height: number }).height, 4.3, 1e-9));
+// Clearance changes size only. A CornerRadius of 0.5 stays 0.5, and crucially
+// a CornerRadius of 0 stays square no matter what the clearance is.
+check('corner radius is NOT grown by clearance',
+  near((conn as { cornerRadius: number }).cornerRadius, 0.5, 1e-9),
+  `got ${(conn as { cornerRadius: number }).cornerRadius}`);
+const sharp = parseBoardFile(CONNECTOR_BOARD.replace('9, 3.5, 0.5, 0.4', '9, 3.5, 0, 0.4'));
+const sharpOut = compileBoard(rigPlace, sharp.board!, BOX, LID);
+check('CornerRadius 0 with clearance 0.4 stays square',
+  (sharpOut.cutouts[0] as { cornerRadius: number }).cornerRadius === 0,
+  `got ${(sharpOut.cutouts[0] as { cornerRadius: number }).cornerRadius}`);
 
 console.log('\n[12] ACCEPTANCE: same connector, board turned 90 deg');
 // direction (0,-1) turned 90 CCW is (1,0) -> world +X -> the right wall.
