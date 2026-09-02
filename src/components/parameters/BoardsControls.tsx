@@ -1,11 +1,22 @@
 'use client';
 
-import { useRef } from 'react';
+import { useCallback, useRef, useState } from 'react';
+import { RefreshCw } from 'lucide-react';
 import { Section } from './ui';
 import { GROUP_COLORS } from '@/config/colors';
 import { useDesign } from '@/store/useDesign';
 import { parseBoardFile } from '@/board/parseBoard';
 import { useEffectiveFeatures } from '@/board/compileAll';
+import {
+  forgetHandle,
+  getHandle,
+  hasHandle,
+  pickBoardFile,
+  rememberHandle,
+  rereadBoardFile,
+  supportsFilePicker,
+  type BoardFileHandle,
+} from '@/board/fileHandles';
 
 /** An alert longer than this is unreadable; the rest is almost always noise. */
 const MAX_ERRORS_SHOWN = 10;
@@ -21,12 +32,17 @@ export function BoardsControls() {
 
   const { boardErrors } = useEffectiveFeatures();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Bumps on every refresh so the row's icon can flash; also forces a re-render
+  // so hasHandle() is re-read after an import.
+  const [, bump] = useState(0);
 
-  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = ''; // allow re-importing the same filename
-    if (!file) return;
-    try {
+  /**
+   * Parse a file and put it in the library. `replacing` is the board this came
+   * from when refreshing, so a renamed board file does not silently leave the
+   * old entry behind.
+   */
+  const ingest = useCallback(
+    async (file: File, handle: BoardFileHandle | null, replacing?: string) => {
       const { board, errors: parseErrors } = parseBoardFile(await file.text());
       if (!board) {
         const shown = parseErrors
@@ -43,10 +59,75 @@ export function BoardsControls() {
         );
         return;
       }
+      const renamed =
+        replacing !== undefined &&
+        replacing.trim().toLowerCase() !== board.name.trim().toLowerCase();
+      if (renamed) {
+        useDesign.getState().removeBoardFromLibrary(replacing);
+        forgetHandle(replacing);
+      }
       addBoard(board);
+      rememberHandle(board.name, handle);
+      bump((n) => n + 1);
+      if (renamed) {
+        alert(
+          `That file now names the board "${board.name}", not "${replacing}".\n\n` +
+            `The old entry was removed. Any placement line still saying ` +
+            `"${replacing}" needs updating.`
+        );
+      }
+    },
+    [addBoard]
+  );
+
+  const handleImportClick = async () => {
+    // Checked synchronously, before any await, so the click's user activation
+    // is still live when the fallback input is clicked.
+    if (!supportsFilePicker()) {
+      fileInputRef.current?.click();
+      return;
+    }
+    try {
+      const picked = await pickBoardFile();
+      if (picked && picked !== 'unsupported') await ingest(picked.file, picked.handle);
+    } catch (err) {
+      console.error('[BoxMaker] board import failed:', err);
+      alert('Could not read that file -- check the console.');
+    }
+  };
+
+  const handleImportFallback = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-picking the same filename
+    if (!file) return;
+    try {
+      await ingest(file, null);
     } catch (err) {
       console.error('[BoxMaker] board import failed:', err);
       alert(`Could not read ${file.name} -- check the console.`);
+    }
+  };
+
+  /** Re-read a board's file. Silent when we still hold its handle. */
+  const handleRefresh = async (name: string) => {
+    if (!supportsFilePicker() && !hasHandle(name)) {
+      fileInputRef.current?.click();
+      return;
+    }
+    try {
+      const file = await rereadBoardFile(name);
+      if (file) {
+        // Pass the handle back in so it survives the board being renamed in
+        // its own file -- ingest drops the old entry and its handle with it.
+        await ingest(file, getHandle(name), name);
+        return;
+      }
+      // No handle (page was reloaded), or the file moved: ask for it again.
+      const picked = await pickBoardFile();
+      if (picked && picked !== 'unsupported') await ingest(picked.file, picked.handle, name);
+    } catch (err) {
+      console.error('[BoxMaker] board refresh failed:', err);
+      alert(`Could not re-read the file for "${name}" -- check the console.`);
     }
   };
 
@@ -58,7 +139,7 @@ export function BoardsControls() {
     >
       {/* ---- library ---------------------------------------------------- */}
       <button
-        onClick={() => fileInputRef.current?.click()}
+        onClick={handleImportClick}
         className="w-full px-2 py-1 mb-2 text-xs bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded hover:bg-[var(--border-color)] transition-colors text-[var(--text-secondary)]"
         title="Import a board definition file. Re-importing a board with the same name replaces it, so you can edit the file and import again without deleting it first. The definition is stored inside this design, so the design still renders on a machine that does not have the file."
       >
@@ -72,7 +153,7 @@ export function BoardsControls() {
         contents and says exactly what is wrong, which is a far better failure
         than an unclickable filename.
       */}
-      <input ref={fileInputRef} type="file" onChange={handleImport} className="hidden" />
+      <input ref={fileInputRef} type="file" onChange={handleImportFallback} className="hidden" />
 
       {/* ---- board file format ------------------------------------------ */}
       <details className="mb-2">
@@ -147,7 +228,21 @@ export function BoardsControls() {
                 {b.edges.length > 0 && ` · ${b.edges.length} connector${b.edges.length === 1 ? '' : 's'}`}
               </span>
               <button
-                onClick={() => removeBoard(b.name)}
+                onClick={() => handleRefresh(b.name)}
+                className="text-[var(--text-secondary)] hover:text-[var(--accent)] shrink-0"
+                title={
+                  hasHandle(b.name)
+                    ? `Re-read ${b.name} from the file it was imported from`
+                    : `Re-import ${b.name} -- the file has to be picked again, because the page was reloaded since it was imported`
+                }
+              >
+                <RefreshCw size={11} />
+              </button>
+              <button
+                onClick={() => {
+                  removeBoard(b.name);
+                  forgetHandle(b.name);
+                }}
                 className="text-[var(--text-secondary)] hover:text-red-400 shrink-0"
                 title={`Remove ${b.name} from this design`}
               >
