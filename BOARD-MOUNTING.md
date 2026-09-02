@@ -219,6 +219,12 @@ x-, 15.0, 3.1, 9.0, 3.5, 0.5, 0.4
 Shape args mirror the existing cutout syntax exactly: `Round` takes `Diameter`, `Rect`
 takes `SizeX, SizeY, CornerRadius`.
 
+**`Clearance` grows the opening on every side, and changes SIZE ONLY.** A 10 mm opening
+with `Clearance 0.4` cuts as 10.8. `CornerRadius` comes through exactly as written, so `0`
+stays square. A true outward offset would round a sharp corner by the offset distance --
+but someone who typed `0` means square, and a display window wants square. Anyone who
+wants radius plus clearance can type the sum.
+
 **`[edges]` are connector cutouts through a side wall** -- USB, barrel jack, headers. See
 section 4.3 for the fields, which are the one place the board file does not use plain
 board X/Y.
@@ -274,6 +280,8 @@ Edge, Pos, Z, SizeAlong, SizeZ, CornerRadius, Clearance
   centre sits 1.5 mm above a 1.6 mm board is `Z = 3.1`. Measuring from `Z = 0` keeps the
   number board-intrinsic, so it survives the board being mounted upside down.
 - **`SizeAlong` / `SizeZ`** -- the opening, along the edge and vertically.
+- **`CornerRadius` / `Clearance`** -- as in `[cutouts]`: clearance grows the opening on
+  every side and leaves the corner radius alone.
 
 The compiler resolves the wall, projects the edge point to world coordinates and inverts
 the per-wall frames in `cutouts.ts:123-175` to get the along-wall coordinate. Height comes
