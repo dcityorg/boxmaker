@@ -11,6 +11,24 @@ import {
 const CYLINDER_SEGMENTS = 32;
 
 /**
+ * COPLANAR-FACE GOTCHA -- see the long note in geometry/snap.ts.
+ *
+ * A standoff's screw hole is drilled from the free end, so the cutter's end
+ * face is ALWAYS on the same plane as the standoff's free end face -- for every
+ * standoff with a hole, not just some edge case. Manifold has coped with this
+ * fine to date (every example design has standoff holes and they print open),
+ * so this offset is DEFENSIVE HARDENING, not the fix for an observed bug. It
+ * follows the standing instruction in snap.ts to break coplanarity on any
+ * subtracted feature, and it matters more now that boards will generate
+ * standoffs in bulk.
+ *
+ * 0.01 mm is far below FDM print tolerance. Only the free end is offset -- the
+ * far end of the hole stays exactly where the user asked, so the drilled depth
+ * is unchanged and existing designs keep their geometry.
+ */
+const COPLANAR_EPS = 0.01;
+
+/**
  * Build one standoff body (cylinder, optionally with a base fillet) standing
  * upright with its BASE at z=0 and axis on +Z. The "base" is the surface-
  * attached end (where the fillet, if any, blooms outward). Caller orients
@@ -52,11 +70,21 @@ async function buildStandoffBody(s: StandoffParams): Promise<Manifold> {
   return solid;
 }
 
-/** Hole cylinder centered on +Z, base at z=0, extending up by holeDepth. */
+/**
+ * Hole cylinder centered on +Z, base at z=0, extending up by
+ * holeDepth + COPLANAR_EPS. The caller positions it so the extra length hangs
+ * past the standoff's FREE end; the drilled depth is still exactly holeDepth.
+ */
 async function buildStandoffHole(s: StandoffParams): Promise<Manifold | null> {
   if (s.holeDia <= 0 || s.holeDepth <= 0) return null;
   const { Manifold } = await getManifold();
-  return Manifold.cylinder(s.holeDepth, s.holeDia / 2, undefined, CYLINDER_SEGMENTS, false);
+  return Manifold.cylinder(
+    s.holeDepth + COPLANAR_EPS,
+    s.holeDia / 2,
+    undefined,
+    CYLINDER_SEGMENTS,
+    false
+  );
 }
 
 /**
@@ -135,7 +163,10 @@ export async function buildFloorStandoffs(
 
     const hole = await buildStandoffHole(s);
     if (hole) {
-      // Hole drilled from the free end (top, z = baseZ + height) down by holeDepth.
+      // Hole drilled from the free end (top, z = baseZ + height) down by
+      // holeDepth. The cylinder is COPLANAR_EPS longer than holeDepth, and the
+      // base stays put, so the surplus pokes out through the top face and the
+      // drilled depth below that face is still exactly holeDepth.
       const holeBaseZ = baseZ + s.height - s.holeDepth;
       holes.push(hole.translate(wx, wy, holeBaseZ));
       hole.delete();
@@ -180,8 +211,10 @@ export async function buildLidStandoffs(
 
     const hole = await buildStandoffHole(s);
     if (hole) {
-      // Hole drilled from the free (bottom) end upward by holeDepth.
-      const holeBaseZ = lid.coverShoulderDepth - s.height;
+      // Hole drilled from the free (bottom) end upward by holeDepth. Here the
+      // free end is the BOTTOM, so drop the base by COPLANAR_EPS: the surplus
+      // pokes out below the free end while the far end of the hole stays put.
+      const holeBaseZ = lid.coverShoulderDepth - s.height - COPLANAR_EPS;
       holes.push(hole.translate(wx, wy, holeBaseZ));
       hole.delete();
     }

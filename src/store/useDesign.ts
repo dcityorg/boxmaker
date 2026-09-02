@@ -59,15 +59,22 @@ export interface SnapFitParams {
  * A single standoff: cylinder rising from the floor or hanging from the lid
  * interior, optionally with a concentric screw hole and base fillet.
  *
- * Surface coordinate frames (matches Fusion BoxMaker):
- *   Floor: 0,0 at interior BACK-RIGHT corner -- "lower-left" of top view.
- *          User +X grows toward the world -X side; user +Y grows toward
- *          the world -Y side (front).
- *   Lid:   0,0 at the BACK-LEFT inner corner of the shoulder pocket --
- *          "bottom-left" when lying inside the box with head at the back
- *          wall, looking up. User +X grows toward the world +X (right);
- *          user +Y grows toward the world -Y (front). Inner-radius on the
- *          pocket is ignored.
+ * Surface coordinate frames (v0.9.0, matches Fusion BoxMaker). Both surfaces
+ * are described AS VIEWED FROM INSIDE THE BOX:
+ *   Floor: 0,0 at the interior FRONT-LEFT corner -- "lower-left when looking
+ *          down at the box with the front edge near you". User +X grows toward
+ *          the right of the box (world +X); user +Y grows toward the back
+ *          (world +Y).
+ *   Lid:   0,0 at the FRONT-LEFT inner corner of the shoulder pocket as viewed
+ *          from inside, i.e. looking up at the lid's underside -- which in
+ *          world coords is the +X side at -Y. User +X grows toward the LEFT of
+ *          the box (world -X), mirrored from the floor because the underside
+ *          mirrors the top face; user +Y grows toward the back (world +Y). The
+ *          pocket's inner corner radius is ignored -- 0,0 is the square corner.
+ *
+ * Authoritative implementation: floorAnchorXY / lidAnchorXY in
+ * geometry/standoffs.ts. User-facing wording: the coordinate-frames section of
+ * components/editor/HelpPanel.tsx.
  *
  * Canonical state lives in `standoffsText` (a comma-delimited textarea), and
  * `standoffs` is derived by parsing that text on every edit.
@@ -97,14 +104,21 @@ export type CutoutSurface = 'front' | 'back' | 'left' | 'right' | 'floor' | 'lid
  * A cutout: hole through a wall, the floor, or the lid. Round or rectangular.
  * Position is the cutout's center in the surface's 2D sketch frame.
  *
- * Walls: 0,0 at the wall's interior bottom-left when viewed from outside the
- *        box. +X is viewer's right, +Y is up (world +Z).
- * Floor: 0,0 at the interior back-right corner -- "lower-left" of top view.
- *        User +X grows toward the world -X side; user +Y grows toward world
- *        -Y (front). Matches Fusion BoxMaker.
- * Lid:   0,0 at the BACK-LEFT inner corner of the shoulder pocket -- the
- *        "bottom-left" when lying inside the box with head at the back wall,
- *        looking up. User +X to world +X (right), user +Y to world -Y (front).
+ * All frames are described AS VIEWED FROM INSIDE THE BOX (v0.9.0, matches
+ * Fusion BoxMaker).
+ *
+ * Walls: 0,0 at the wall's interior bottom-left as viewed from INSIDE the box
+ *        (standing inside, facing the wall). +X is that viewer's right, +Y is
+ *        up (world +Z) measured from the INTERIOR floor, not from z=0.
+ * Floor: 0,0 at the interior FRONT-LEFT corner. User +X grows toward the right
+ *        of the box (world +X); user +Y grows toward the back (world +Y).
+ * Lid:   0,0 at the FRONT-LEFT inner corner of the shoulder pocket as viewed
+ *        from inside, looking up at the underside -- the +X side at -Y in world
+ *        coords. User +X grows toward the LEFT of the box (world -X), mirrored
+ *        from the floor; user +Y grows toward the back (world +Y). The pocket's
+ *        inner corner radius is ignored -- 0,0 is the square corner.
+ *
+ * Authoritative implementation: the per-surface switch in geometry/cutouts.ts.
  */
 export type CutoutParams =
   | {
