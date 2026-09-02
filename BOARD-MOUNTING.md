@@ -122,24 +122,28 @@ The result lands in the target surface's existing user frame, so it is passed st
 `floorAnchorXY` / `lidAnchorXY` in `geometry/standoffs.ts:68-97`. No new world-space math
 is written, and the lid's mirrored `+X` is already handled there. See section 9.
 
-**Rotation constraint on rectangular cutouts.** An earlier draft of this doc claimed
-arbitrary rotation was free because "cutouts are already arbitrary prisms". That is wrong
-for rects: `CutoutParams` rects are axis-aligned in the surface frame and carry no
-rotation of their own (`useDesign.ts`, and `cutoutCrossSection` in `cutouts.ts:19-42`).
+**Rotation is restricted to multiples of 90.** Decided 2026-09-01: boards mount square to
+the box in practice, and the restriction pays for itself three times over.
 
-So, as built:
+- **Rectangular cutouts become possible at all.** `CutoutParams` rects are axis-aligned in
+  the surface frame with no rotation of their own (`cutoutCrossSection`, `cutouts.ts:19-42`),
+  so an arbitrarily-angled board could not express one. A quarter turn just swaps the two
+  dimensions.
+- **Connector cutouts become possible at all** (section 4.3). A board edge only faces a
+  wall squarely at a quarter turn.
+- **The transform becomes exact.** No trigonometry: `(x, y) -> (-y, x)` per turn is integer
+  arithmetic on the coordinates, so a turned board lands on precise numbers instead of ones
+  carrying 1e-16 of float noise. Rotation 0 and 360 now agree bit for bit.
 
-| Feature | Rotation allowed |
-|---|---|
-| standoffs | any angle |
-| round cutouts | any angle |
-| rect cutouts | 0 / 90 / 180 / 270 only -- 90 and 270 swap the two dimensions |
+A non-orthogonal rotation is rejected by the placement parser, and again by the compiler,
+which emits nothing for that board rather than emitting a partial one.
 
-A board at a non-orthogonal angle still compiles its standoffs and round cutouts; only its
-rect cutouts are rejected, with an error naming the angle. Lifting the restriction means
-adding an optional `rotation` to `CutoutParams` and one `CrossSection.rotate` call in
-`geometry/cutouts.ts` -- additive and small, but it touches proven geometry, so it is not
-being done unasked.
+**Rotation is CCW in the MOUNTING SURFACE's frame**, and the lid frame is mirrored in
+world. So the same rotation number spins a lid-mounted board the opposite way round from a
+floor-mounted one. That is the consistent choice -- the user works in the frame they can
+see -- but it means a board moved from floor to lid keeps its number and changes its
+physical spin. At rotation 0 there is nothing to notice: the mirrored frame and the
+mirrored board cancel, and a lid board faces exactly the same walls as a floor board.
 
 ### 3.4 Worked example: the Air Quality Monitor's OLED
 
@@ -205,8 +209,8 @@ CornerRadius, 1.5
 top,    Rect,  25.4, 11.4, 30, 15, 1, 0.4
 bottom, Round, 10.0,  5.0, 3.5, 0.3
 
-[edges]                        // RESERVED, phase 2 -- connector cutouts
-// Edge, X, Z, SizeX, SizeZ, CornerRadius, Clearance
+[edges]                        // Edge, Pos, Z, SizeAlong, SizeZ, CornerRadius, Clearance
+x-, 15.0, 3.1, 9.0, 3.5, 0.5, 0.4
 
 [keepouts]                     // OPTIONAL: X, Y, SizeX, SizeY, Height, Side
 0, 0, 50.8, 22.86, 8, top
@@ -215,7 +219,9 @@ bottom, Round, 10.0,  5.0, 3.5, 0.3
 Shape args mirror the existing cutout syntax exactly: `Round` takes `Diameter`, `Rect`
 takes `SizeX, SizeY, CornerRadius`.
 
-`[edges]` is reserved from day one so phase 2 is an addition, not a format break.
+**`[edges]` are connector cutouts through a side wall** -- USB, barrel jack, headers. See
+section 4.3 for the fields, which are the one place the board file does not use plain
+board X/Y.
 
 **`[keepouts]` are "nothing else here" volumes** -- a box marking a tall component: an
 electrolytic cap, a USB connector, a pin header, the OLED module itself. Entirely
@@ -249,6 +255,31 @@ board. The board file carries only the board's own hole diameter, which validati
 sanity-check the standoff OD.
 
 ---
+
+### 4.3 Connector cutouts -- the `[edges]` section
+
+```
+Edge, Pos, Z, SizeAlong, SizeZ, CornerRadius, Clearance
+```
+
+- **`Edge`** -- `x+`, `x-`, `y+`, `y-`: which board edge the connector sits on, named in
+  board-local terms. `x+` is the edge at maximum board X. Which box wall that ends up
+  facing is resolved at placement time from the surface, the components direction and the
+  rotation.
+- **`Pos`** -- position along that edge, in board coordinates. Board **Y** for an `x+`/`x-`
+  edge, board **X** for a `y+`/`y-` edge.
+- **`Z`** -- the opening's centre height above the board's **non-component face**, i.e.
+  above board `Z = 0` (section 3.1). For a connector on the component side that is the
+  board thickness plus the datasheet's height above the board surface: a USB-C jack whose
+  centre sits 1.5 mm above a 1.6 mm board is `Z = 3.1`. Measuring from `Z = 0` keeps the
+  number board-intrinsic, so it survives the board being mounted upside down.
+- **`SizeAlong` / `SizeZ`** -- the opening, along the edge and vertically.
+
+The compiler resolves the wall, projects the edge point to world coordinates and inverts
+the per-wall frames in `cutouts.ts:123-175` to get the along-wall coordinate. Height comes
+from `boardZToWorldZ`, which accounts for the board resting on the standoffs' free ends --
+which rise from the floor, or hang below the lid plate where it sits on the box rim at
+`box.height`.
 
 ## 5. Board library
 
@@ -427,35 +458,31 @@ Phase 0 complete -- commit `126be43`.
       the floor/lid frame conversion for a feature that cuts the far surface.
 - [x] Acceptance check (`src/board/__acceptance.ts`, `npm run check:board`) -- 33 checks,
       headed by reproducing the Air Quality OLED standoffs exactly. All passing.
-- [ ] Board library: built-ins plus file import, embedded by value in the design.
+- [x] Rotation restricted to quarter turns, enforced in both the parser and the compiler.
+- [x] Connector cutouts through side walls (`[edges]`), pulled forward from phase 2 at
+      Gary's request -- he has a box needing them now.
+- [ ] Board library: file import, embedded by value in the design. Built-in boards are
+      **deferred** by Gary's call; the library ships empty.
 - [ ] `boardsText` textarea wired into the store, new sidebar group and colour.
-- [ ] Rotation: any angle for standoffs and round cutouts; rects restricted to quarter
-      turns (see section 3.3).
+- [ ] Merge compiled output into the geometry inputs (`effectiveStandoffs` /
+      `effectiveCutouts`).
 - [ ] Ghost board preview, plus keepout slabs.
 - [ ] `boardWarnings()` and its viewport ghosts.
 - [ ] "Explode to raw lines" escape hatch.
 - [ ] Help panel section; persistence, undo and autosave wiring.
 
-### Phase 2 -- edge / connector cutouts
+### Phase 2 -- validation and preview
 
-Most real boards have a USB jack, barrel connector or header on an **edge**, needing a
-rectangular hole through a side wall. This is arguably the difference between "the board
-mounts" and "the box is finished."
+Connector cutouts moved into phase 1. What is left is everything that tells the user their
+board does not fit.
 
-The wall cutout frames already exist (`cutouts.ts:123-175`): X runs along the wall viewed
-from inside, Y is height above the interior floor. So this still compiles to existing
-primitives.
-
-**Constraint:** a board edge only faces a wall squarely at 0 / 90 / 180 / 270 degrees.
-Edge cutouts must be rejected with a warning at other angles, even though standoffs and
-top/bottom cutouts remain valid at any angle.
-
-- [ ] `[edges]` section parsing.
-- [ ] Edge -> wall resolution through the placement rotation.
-- [ ] Warning when a board with edge features is placed at a non-orthogonal angle.
+- [ ] `boardWarnings()` in `validation/checks.ts`, plus its viewport ghosts (section 7).
+- [ ] Ghost board preview and keepout slabs (section 8).
 - [ ] Warning when a projected connector cutout misses its wall or crosses a corner.
-
----
+- [ ] Warning when a compiled cutout falls outside its target surface.
+- [ ] Auto-clamp standoff base fillets to wall clearance, with an advisory (section 11).
+- [ ] "Explode to raw lines" escape hatch.
+- [ ] Help panel section -- the single source of truth for user-facing semantics.
 
 ## 14. Future add-ons (not scheduled)
 

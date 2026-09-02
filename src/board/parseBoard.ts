@@ -3,6 +3,8 @@
 import type {
   BoardCutout,
   BoardDefinition,
+  BoardEdge,
+  BoardEdgeCutout,
   BoardFeatureSide,
   BoardKeepout,
   BoardMount,
@@ -18,8 +20,8 @@ import type {
  *   [board]      Name / Size / Thickness / CornerRadius key-value lines
  *   [mounts]     X, Y, BoardHoleDia
  *   [cutouts]    Side, Shape, X, Y, <shape args>, Clearance
+ *   [edges]      Edge, Pos, Z, SizeAlong, SizeZ, CornerRadius, Clearance
  *   [keepouts]   X, Y, SizeX, SizeY, Height, Side          (optional)
- *   [edges]      reserved for connector cutouts, phase 2 -- rejected for now
  *
  * `//` starts a comment anywhere on a line, including after data, and runs to
  * the end of the line. That differs from the design textareas, which only
@@ -36,6 +38,7 @@ export function parseBoardFile(text: string): {
   const errors: BoardParseError[] = [];
   const mounts: BoardMount[] = [];
   const cutouts: BoardCutout[] = [];
+  const edges: BoardEdgeCutout[] = [];
   const keepouts: BoardKeepout[] = [];
 
   let name: string | null = null;
@@ -189,10 +192,23 @@ export function parseBoardFile(text: string): {
       }
 
       case 'edges': {
-        errors.push({
-          line: lineNo,
-          reason: '[edges] is reserved for connector cutouts and is not implemented yet',
-        });
+        const edge = parseEdge(tokens[0]);
+        const nums = numbers(tokens.slice(1));
+        if (tokens.length !== 7 || nums === null || edge === null) {
+          errors.push({
+            line: lineNo,
+            reason:
+              `expected 7 fields (Edge,Pos,Z,SizeAlong,SizeZ,CornerRadius,Clearance) ` +
+              `with Edge one of x+ x- y+ y-, got ${tokens.length} fields`,
+          });
+          break;
+        }
+        const [pos, z, sizeAlong, sizeZ, cornerRadius, clearance] = nums;
+        if (sizeAlong <= 0 || sizeZ <= 0) {
+          errors.push({ line: lineNo, reason: 'SizeAlong and SizeZ must be positive' });
+          break;
+        }
+        edges.push({ line: lineNo, edge, pos, z, sizeAlong, sizeZ, cornerRadius, clearance });
         break;
       }
     }
@@ -213,6 +229,7 @@ export function parseBoardFile(text: string): {
       cornerRadius,
       mounts,
       cutouts,
+      edges,
       keepouts,
     },
     errors,
@@ -230,6 +247,12 @@ function numbers(tokens: string[]): number[] | null {
   const nums = tokens.map((t) => parseFloat(t));
   if (nums.some((n) => !Number.isFinite(n))) return null;
   return nums;
+}
+
+function parseEdge(token: string | undefined): BoardEdge | null {
+  const v = (token ?? '').toLowerCase().replace(/\s+/g, '');
+  if (v === 'x+' || v === 'x-' || v === 'y+' || v === 'y-') return v;
+  return null;
 }
 
 function parseSide(token: string | undefined): BoardFeatureSide | null {

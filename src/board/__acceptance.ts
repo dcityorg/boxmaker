@@ -13,8 +13,8 @@
 import type { BoxParams, LidParams } from '@/store/useDesign';
 import { parseBoardFile } from './parseBoard';
 import { parseBoardsText } from './parsePlacements';
-import { compileBoard, convertFrame, isMirrored, targetSurface, boardToSurface } from './compile';
-import type { BoardPlacement } from './types';
+import { compileBoard, convertFrame, isMirrored, targetSurface, boardToSurface, wallFacedBy, boardZToWorldZ } from './compile';
+import type { BoardEdge, BoardPlacement } from './types';
 
 const BOX: BoxParams = {
   mode: 'exterior', length: 125, width: 82, height: 76,
@@ -125,22 +125,126 @@ for (const rot of [0, 37, 90, 180, 270, 360]) {
 check('mirroring keeps the diagonal', near(dist(mk('floor','down')), base, 1e-9));
 const at0 = boardToSurface({ ...mk('floor', 'up'), rotation: 0 }, 5, 7);
 const at360 = boardToSurface({ ...mk('floor', 'up'), rotation: 360 }, 5, 7);
-// Not exact: Math.sin(2*PI) is -2.4e-16, not 0. Tolerance, not equality.
-check('rotation 0 and 360 agree to 1e-12',
-  near(at0.x, at360.x, 1e-12) && near(at0.y, at360.y, 1e-12),
+// Exact, not approximate: quarter turns are integer arithmetic on the
+// coordinates, so there is no trigonometry to leak 1e-16 of error.
+check('rotation 0 and 360 agree EXACTLY',
+  at0.x === at360.x && at0.y === at360.y,
   `0 -> ${at0.x},${at0.y}  360 -> ${at360.x},${at360.y}`);
-check('rotation 90 sends board +X to surface +Y',
-  near(boardToSurface({ ...mk('floor', 'up'), rotation: 90 }, 10, 0).x, 0, 1e-12) &&
-  near(boardToSurface({ ...mk('floor', 'up'), rotation: 90 }, 10, 0).y, 10, 1e-12));
+check('rotation 90 sends board +X to surface +Y, exactly',
+  boardToSurface({ ...mk('floor', 'up'), rotation: 90 }, 10, 0).y === 10);
 
-console.log('\n[9] rect cutouts reject non-orthogonal rotations');
+console.log('\n[9] rotation is restricted to quarter turns');
+const badRot = parseBoardsText('floor, 0, 0, 45, up, 6, 6, 2.6, 8, 1, X');
+check('placement parser rejects 45', badRot.errors.length === 1 && badRot.placements.length === 0,
+  JSON.stringify(badRot.errors));
 const skew = compileBoard({ ...placements[0], rotation: 45 }, board!, BOX, LID);
-check('45 deg produces an error', skew.errors.length === 1, JSON.stringify(skew.errors));
-check('standoffs still emitted at 45 deg', skew.standoffs.length === 4);
+check('compiler rejects 45 outright, emitting nothing',
+  skew.errors.length === 1 && skew.standoffs.length === 0 && skew.cutouts.length === 0);
 const quarter = compileBoard({ ...placements[0], rotation: 90 }, board!, BOX, LID);
 check('90 deg swaps the rect dimensions',
   quarter.errors.length === 0 && quarter.cutouts[0].kind === 'rect' &&
-  near((quarter.cutouts[0] as {width:number}).width, 26.9) &&
-  near((quarter.cutouts[0] as {height:number}).height, 79.6));
+  near((quarter.cutouts[0] as { width: number }).width, 26.9) &&
+  near((quarter.cutouts[0] as { height: number }).height, 79.6));
+
+// -------------------------------------------------------------- connectors
+const CONNECTOR_BOARD = `
+[board]
+Name, Connector rig
+Size, 50, 30
+Thickness, 1.6
+
+[mounts]
+2.5, 2.5, 2.2
+
+[edges]      // Edge, Pos, Z, SizeAlong, SizeZ, CornerRadius, Clearance
+y-, 25, 3.1, 9, 3.5, 0.5, 0.4
+`;
+const rig = parseBoardFile(CONNECTOR_BOARD);
+
+console.log('\n[10] the [edges] section parses');
+check('no errors', rig.errors.length === 0, JSON.stringify(rig.errors));
+check('one edge cutout on y-', rig.board!.edges.length === 1 && rig.board!.edges[0].edge === 'y-');
+const badEdge = parseBoardFile('[board]\nName, x\nSize, 1, 1\n[mounts]\n0,0,1\n[edges]\nz+, 1,1,1,1,0,0\n');
+check('rejects an unknown edge name', badEdge.errors.some((e) => /Edge one of/.test(e.reason)));
+
+console.log('\n[11] ACCEPTANCE: connector through a wall, hand-computed');
+// floor, components up, rotation 0, board 0,0 at floor user (10,20), standoffs 6 high.
+// y- edge faces the front wall. Edge point (25,0) -> floor user (35,20)
+//   -> world (-25, -18.5) -> front-wall along = 62.5-2.5-(-25) = 85
+// z: board sits at floorThickness+height = 8.5; components up so board Z runs
+//   with world Z from the lower face: 8.5 + 3.1 = 11.6, less floorThickness = 9.1
+const rigPlace: BoardPlacement = {
+  surface: 'floor', x: 10, y: 20, rotation: 0, components: 'up',
+  standoffHeight: 6, standoffOd: 6, standoffHoleDia: 2.6, standoffHoleDepth: 8,
+  baseFillet: 1, boardName: 'Connector rig',
+};
+const rigOut = compileBoard(rigPlace, rig.board!, BOX, LID);
+check('no compile errors', rigOut.errors.length === 0, JSON.stringify(rigOut.errors));
+const conn = rigOut.cutouts[0];
+check('cuts the FRONT wall', conn.surface === 'front', `got ${conn.surface}`);
+check('along the wall at 85', near(conn.x, 85, 1e-9), `got ${conn.x}`);
+check('9.1 above the interior floor', near(conn.y, 9.1, 1e-9), `got ${conn.y}`);
+check('grown by clearance to 9.8 x 4.3, radius 0.9',
+  conn.kind === 'rect' && near((conn as { width: number }).width, 9.8, 1e-9) &&
+  near((conn as { height: number }).height, 4.3, 1e-9) &&
+  near((conn as { cornerRadius: number }).cornerRadius, 0.9, 1e-9));
+
+console.log('\n[12] ACCEPTANCE: same connector, board turned 90 deg');
+// direction (0,-1) turned 90 CCW is (1,0) -> world +X -> the right wall.
+// Edge point (25,0) -> rotated (0,25) -> floor user (10,45) -> world (-50, 6.5)
+//   -> right-wall along = 41-2.5-6.5 = 32. Height is unchanged.
+const turned = compileBoard({ ...rigPlace, rotation: 90 }, rig.board!, BOX, LID);
+check('cuts the RIGHT wall', turned.cutouts[0].surface === 'right', `got ${turned.cutouts[0].surface}`);
+check('along the wall at 32', near(turned.cutouts[0].x, 32, 1e-9), `got ${turned.cutouts[0].x}`);
+check('height unchanged at 9.1', near(turned.cutouts[0].y, 9.1, 1e-9));
+
+console.log('\n[13] ACCEPTANCE: connector on a lid-mounted board');
+// lid + components up is the mirrored case. Board x- edge, mirrored, becomes
+// user +X, which on the lid is world -X -> the left wall.
+// Edge point (0,15) -> lid user (104.2, 50.5) -> world (-46.9, 14.7)
+//   -> left-wall along = 14.7+41-2.5 = 53.2
+// z: plate underside sits on the rim at 76; standoffs hang 2.6, so the board's
+//   UPPER (component) face is at 73.4. Board Z 3.1 is 1.5 above that: 74.9,
+//   less floorThickness = 72.4
+const lidRig = parseBoardFile(CONNECTOR_BOARD.replace('y-, 25,', 'x-, 15,').replace('Size, 50, 30', 'Size, 96.6, 30.1'));
+const lidOut = compileBoard(
+  { ...placements[0], standoffHeight: 2.6 }, lidRig.board!, BOX, LID
+);
+const lidConn = lidOut.cutouts.find((c) => c.surface === 'left');
+check('cuts the LEFT wall', !!lidConn);
+check('along the wall at 53.2', !!lidConn && near(lidConn.x, 53.2, 1e-9), `got ${lidConn?.x}`);
+check('72.4 above the interior floor', !!lidConn && near(lidConn.y, 72.4, 1e-9), `got ${lidConn?.y}`);
+
+console.log('\n[14] which wall each edge faces');
+const wallOf = (surface: 'floor' | 'lid', components: 'up' | 'down', rot: number, edge: BoardEdge) =>
+  wallFacedBy({ ...mk(surface, components), rotation: rot }, edge, ((rot / 90) % 4 + 4) % 4);
+check('floor+up, no rotation: x+ right, x- left, y+ back, y- front',
+  wallOf('floor', 'up', 0, 'x+') === 'right' && wallOf('floor', 'up', 0, 'x-') === 'left' &&
+  wallOf('floor', 'up', 0, 'y+') === 'back' && wallOf('floor', 'up', 0, 'y-') === 'front');
+// At rotation 0 the lid's mirrored user frame and the mirrored board cancel
+// exactly, so a lid board faces the SAME walls as a floor board -- which is
+// right: "components up, rotation 0" fixes the board's orientation in the
+// world regardless of what it is screwed to.
+check('lid+up at rotation 0 faces the same walls as floor+up',
+  wallOf('lid', 'up', 0, 'x+') === 'right' && wallOf('lid', 'up', 0, 'x-') === 'left' &&
+  wallOf('lid', 'up', 0, 'y+') === 'back' && wallOf('lid', 'up', 0, 'y-') === 'front');
+// They do NOT cancel once rotated. Rotation is CCW in the MOUNTING SURFACE's
+// frame, and the lid frame is mirrored in world, so the same rotation number
+// spins a lid board the opposite way round. Pinned here so it stays deliberate.
+check('a quarter turn spins a lid board opposite to a floor board',
+  wallOf('floor', 'up', 90, 'y-') === 'right' && wallOf('lid', 'up', 90, 'y-') === 'left');
+check('quarter turns walk y- around all four walls',
+  wallOf('floor', 'up', 0, 'y-') === 'front' && wallOf('floor', 'up', 90, 'y-') === 'right' &&
+  wallOf('floor', 'up', 180, 'y-') === 'back' && wallOf('floor', 'up', 270, 'y-') === 'left');
+
+console.log('\n[15] board Z -> world Z for all four mountings');
+const zAt = (surface: 'floor' | 'lid', components: 'up' | 'down', boardZ: number) =>
+  boardZToWorldZ({ ...mk(surface, components), standoffHeight: 6 }, rig.board!, boardZ, BOX);
+check('floor+up: lower face on the standoff at 8.5', near(zAt('floor', 'up', 0), 8.5, 1e-9));
+check('floor+up: component face 1.6 higher', near(zAt('floor', 'up', 1.6), 10.1, 1e-9));
+check('floor+down: component face on the standoff at 8.5', near(zAt('floor', 'down', 1.6), 8.5, 1e-9));
+check('floor+down: board Z grows downward', near(zAt('floor', 'down', 0), 10.1, 1e-9));
+check('lid+up: component face on the standoff at 70', near(zAt('lid', 'up', 1.6), 70, 1e-9));
+check('lid+down: non-component face on the standoff at 70', near(zAt('lid', 'down', 0), 70, 1e-9));
 
 console.log(`\n${failures === 0 ? 'ALL CHECKS PASSED' : failures + ' CHECK(S) FAILED'}\n`);

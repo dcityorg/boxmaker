@@ -17,6 +17,13 @@ const NAME_FIELD_INDEX = 10;
  * compile.ts, because the boolean is counter-intuitive in the common case (see
  * BOARD-MOUNTING.md section 3.2).
  *
+ * Rotation is restricted to multiples of 90. Boards are rectangular and mount
+ * square to the box in practice, and the restriction buys exactness: the
+ * transform in compile.ts is integer arithmetic with no trigonometry, so a
+ * quarter-turned board lands on precise coordinates rather than ones carrying
+ * 1e-16 of float noise. It is also what makes connector cutouts possible at all
+ * -- a board edge only faces a wall squarely at a quarter turn.
+ *
  * BoardName is everything past the 10th comma, so commas inside a board's name
  * survive -- the same trick parseTextLabelsText uses for label text. Lines
  * starting with `//` are comments; blank lines are skipped.
@@ -64,6 +71,14 @@ export function parseBoardsText(text: string): {
       continue;
     }
     const [x, y, rotation, standoffHeight, standoffOd, standoffHoleDia, standoffHoleDepth, baseFillet] = nums;
+
+    if (!Number.isInteger(rotation / 90)) {
+      errors.push({
+        line: lineNo,
+        reason: `Rotation must be a multiple of 90, got ${rotation}`,
+      });
+      continue;
+    }
 
     const boardName = tail.trim();
     if (boardName === '') {

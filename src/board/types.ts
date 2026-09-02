@@ -61,6 +61,36 @@ export type BoardCutout =
       clearance: number;
     };
 
+/**
+ * Which edge of the board a connector sits on, in BOARD-LOCAL terms:
+ * `x+` is the edge at maximum board X, `y-` the edge at Y = 0, and so on.
+ * Which box wall that edge ends up facing is resolved at placement time.
+ */
+export type BoardEdge = 'x+' | 'x-' | 'y+' | 'y-';
+
+/**
+ * A connector cutout through a side wall: USB, barrel jack, header.
+ *
+ *   pos   -- along the named edge, in board coordinates. Board Y for an x+/x-
+ *            edge, board X for a y+/y- edge.
+ *   z     -- the cutout centre's height above the board's NON-COMPONENT face,
+ *            i.e. above board Z = 0 (section 3.1). For a connector on the
+ *            component side, that is the board thickness plus whatever the
+ *            datasheet gives above the board surface: a USB-C jack whose centre
+ *            is 1.5 mm above a 1.6 mm board is z = 3.1.
+ *   sizeAlong / sizeZ -- opening size along the edge and vertically.
+ */
+export interface BoardEdgeCutout {
+  line?: number;
+  edge: BoardEdge;
+  pos: number;
+  z: number;
+  sizeAlong: number;
+  sizeZ: number;
+  cornerRadius: number;
+  clearance: number;
+}
+
 /** A "nothing else here" volume: a tall component, a connector, a header. */
 export interface BoardKeepout {
   line?: number;
@@ -82,6 +112,7 @@ export interface BoardDefinition {
   cornerRadius: number;
   mounts: BoardMount[];
   cutouts: BoardCutout[];
+  edges: BoardEdgeCutout[];
   keepouts: BoardKeepout[];
 }
 
@@ -103,7 +134,10 @@ export interface BoardPlacement {
   /** Where the board's 0,0 lands, in the mounting surface's user frame (mm). */
   x: number;
   y: number;
-  /** Degrees CCW about the board origin, in the mounting surface's frame. */
+  /**
+   * Degrees CCW about the board origin, in the mounting surface's frame.
+   * Restricted to multiples of 90 -- see BOARD-MOUNTING.md section 3.3.
+   */
   rotation: number;
   components: ComponentsFacing;
   standoffHeight: number;
