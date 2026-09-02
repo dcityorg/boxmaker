@@ -20,6 +20,7 @@ export function SettingsControls() {
     appearance.lidColor === DEFAULT_APPEARANCE.lidColor &&
     appearance.showRulers === DEFAULT_APPEARANCE.showRulers &&
     appearance.showOrigins === DEFAULT_APPEARANCE.showOrigins &&
+    appearance.showClearance === DEFAULT_APPEARANCE.showClearance &&
     appearance.view === DEFAULT_APPEARANCE.view;
 
   return (
@@ -62,6 +63,12 @@ export function SettingsControls() {
         checked={appearance.showOrigins}
         onChange={(v) => setAppearance({ showOrigins: v })}
         tooltip="Place a thin red cylinder NEAR each surface's (0, 0) corner -- offset 3 mm in each axis so it clears the inner corner radius. The cylinder runs perpendicular to the surface so it pokes through both faces of a wall -- visible from inside and outside the box."
+      />
+      <Toggle
+        label="Show Clearance"
+        checked={appearance.showClearance}
+        onChange={(v) => setAppearance({ showClearance: v })}
+        tooltip="Draw a translucent box for every placed board (teal, sized by the board file's Height) and every free-standing object (slate). Anything overlapping something else turns red. Purely a design aid -- never geometry, never exported."
       />
       <RadioRow
         label="View"

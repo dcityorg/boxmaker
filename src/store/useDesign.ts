@@ -451,6 +451,8 @@ export function parseCutoutsText(text: string): {
  * Lines starting with `//` (after trimming) are comments. Errors are
  * collected with line numbers so the UI can flag them inline.
  */
+export { parseObjectsText };
+
 export function parseStandoffsText(text: string): {
   standoffs: StandoffParams[];
   errors: StandoffParseError[];
@@ -493,13 +495,22 @@ export function parseStandoffsText(text: string): {
 }
 
 import { parseBoardsText } from '@/board/parsePlacements';
-import type { BoardDefinition, BoardPlacement, BoardPlacementParseError } from '@/board/types';
+import { parseObjectsText } from '@/board/parseObjects';
+import type {
+  BoardDefinition,
+  BoardPlacement,
+  BoardPlacementParseError,
+  BoxObjectParams,
+  BoxObjectParseError,
+} from '@/board/types';
 
 export interface AppearanceSettings {
   boxColor: string;
   lidColor: string;
   showRulers: boolean;
   showOrigins: boolean;
+  /** Translucent boxes for placed boards and free-standing objects. */
+  showClearance: boolean;
   view: ViewMode;
 }
 
@@ -528,6 +539,10 @@ export interface DesignState {
   boards: BoardPlacement[];
   boardErrors: BoardPlacementParseError[];
   boardLibrary: BoardDefinition[];
+  /** Non-printed occupants -- batteries, speakers. Advisory only, never geometry. */
+  objectsText: string;
+  objects: BoxObjectParams[];
+  objectErrors: BoxObjectParseError[];
 
   setDesignName: (name: string | null) => void;
   setAppearance: (patch: Partial<AppearanceSettings>) => void;
@@ -542,6 +557,7 @@ export interface DesignState {
   setCutoutsText: (text: string) => void;
   setTextLabelsText: (text: string) => void;
   setBoardsText: (text: string) => void;
+  setObjectsText: (text: string) => void;
   /** Add or replace a board definition by name (case-insensitive). */
   addBoardToLibrary: (board: BoardDefinition) => void;
   removeBoardFromLibrary: (name: string) => void;
@@ -561,6 +577,7 @@ export const DEFAULT_APPEARANCE: AppearanceSettings = {
   lidColor: '#6eb4ff',
   showRulers: false,
   showOrigins: false,
+  showClearance: true,
   view: 'assembled',
 };
 
@@ -587,6 +604,7 @@ export const DEFAULT_STANDOFFS_TEXT = '';
 export const DEFAULT_CUTOUTS_TEXT = '';
 export const DEFAULT_TEXT_LABELS_TEXT = '';
 export const DEFAULT_BOARDS_TEXT = '';
+export const DEFAULT_OBJECTS_TEXT = '';
 
 export const DEFAULT_SNAP: SnapFitParams = {
   snapFront: true,
@@ -621,6 +639,9 @@ export const useDesign = create<DesignState>((set) => ({
   boards: [],
   boardErrors: [],
   boardLibrary: [],
+  objectsText: DEFAULT_OBJECTS_TEXT,
+  objects: [],
+  objectErrors: [],
 
   setDesignName: (name) => set({ designName: name }),
   setAppearance: (patch) =>
@@ -647,6 +668,10 @@ export const useDesign = create<DesignState>((set) => ({
   setBoardsText: (text) => {
     const { placements, errors } = parseBoardsText(text);
     set({ boardsText: text, boards: placements, boardErrors: errors, isDirty: true });
+  },
+  setObjectsText: (text) => {
+    const { objects, errors } = parseObjectsText(text);
+    set({ objectsText: text, objects, objectErrors: errors, isDirty: true });
   },
   addBoardToLibrary: (board) =>
     set((s) => {
@@ -682,6 +707,9 @@ export const useDesign = create<DesignState>((set) => ({
       boards: [],
       boardErrors: [],
       boardLibrary: [],
+      objectsText: DEFAULT_OBJECTS_TEXT,
+      objects: [],
+      objectErrors: [],
       isDirty: false,
     }),
   loadDesign: (design) => {
@@ -691,6 +719,7 @@ export const useDesign = create<DesignState>((set) => ({
     // Boards are optional in the file: designs saved before the feature
     // existed have neither field, and must still load.
     const boardsParse = parseBoardsText(design.boardsText ?? DEFAULT_BOARDS_TEXT);
+    const objectsParse = parseObjectsText(design.objectsText ?? DEFAULT_OBJECTS_TEXT);
     set({
       designName: design.designName,
       // Merge with DEFAULT_APPEARANCE so older JSONs (saved before a field
@@ -713,6 +742,9 @@ export const useDesign = create<DesignState>((set) => ({
       boards: boardsParse.placements,
       boardErrors: boardsParse.errors,
       boardLibrary: design.boardLibrary ?? [],
+      objectsText: design.objectsText ?? DEFAULT_OBJECTS_TEXT,
+      objects: objectsParse.objects,
+      objectErrors: objectsParse.errors,
       isDirty: false,
     });
   },

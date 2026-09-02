@@ -14,7 +14,9 @@ import type { BoxParams, LidParams } from '@/store/useDesign';
 import { parseBoardFile } from './parseBoard';
 import { parseBoardsText } from './parsePlacements';
 import { compileBoard, convertFrame, isMirrored, targetSurface, boardToSurface, wallFacedBy, boardZToWorldZ } from './compile';
-import type { BoardEdge, BoardPlacement } from './types';
+import type { BoardEdge, BoardPlacement, BoxObjectParams } from './types';
+import { boardEnvelope, objectEnvelope, envelopesOverlap } from './envelopes';
+import { parseObjectsText } from './parseObjects';
 
 const BOX: BoxParams = {
   mode: 'exterior', length: 125, width: 82, height: 76,
@@ -255,5 +257,81 @@ check('floor+down: component face on the standoff at 8.5', near(zAt('floor', 'do
 check('floor+down: board Z grows downward', near(zAt('floor', 'down', 0), 10.1, 1e-9));
 check('lid+up: component face on the standoff at 70', near(zAt('lid', 'up', 1.6), 70, 1e-9));
 check('lid+down: non-component face on the standoff at 70', near(zAt('lid', 'down', 0), 70, 1e-9));
+
+
+// ------------------------------------------------------- clearance envelopes
+console.log('\n[16] object envelopes, hand-computed');
+const obj = (line: string) => {
+  const { objects, errors } = parseObjectsText(line);
+  if (errors.length) throw new Error(JSON.stringify(errors));
+  return objectEnvelope(objects[0], BOX, LID);
+};
+const near3 = (a: number[], b: number[]) => a.every((v, i) => near(v, b[i], 1e-9));
+
+// floor: world XY = (-60 + x, -38.5 + y); Z starts at the floor's top face 2.5
+const bat = obj('floor, 30, 20, 40, 25, 15, 0, LiPo battery');
+check('floor object min', near3(bat.min, [-50, -31, 2.5]), JSON.stringify(bat.min));
+check('floor object max', near3(bat.max, [-10, -6, 17.5]), JSON.stringify(bat.max));
+check('floor object draws in the box frame', bat.frame === 'box');
+
+// left wall: interior face at x = -60, grows +X; along-wall runs +Y;
+// height is measured UP FROM THE INTERIOR FLOOR, so z = 2.5 + y
+const buz = obj('left, 45, 22, 30, 18, 10, 2, Buzzer');
+check('wall object honours Offset (2mm off the wall)', near(buz.min[0], -58, 1e-9), `${buz.min[0]}`);
+check('wall object depth reaches 12mm in', near(buz.max[0], -48, 1e-9), `${buz.max[0]}`);
+check('wall object spans the wall correctly', near3([buz.min[1], buz.max[1]], [-8.5, 21.5]));
+check('wall object height is above the INTERIOR floor', near3([buz.min[2], buz.max[2]], [15.5, 33.5]),
+  `${buz.min[2]}..${buz.max[2]}`);
+
+console.log('\n[17] board envelopes use Height / HeightBelow');
+const tall = parseBoardFile(`[board]
+Name, Stack
+Size, 50, 30
+Thickness, 1.6
+Height, 14
+HeightBelow, 2
+[mounts]
+3, 3, 2.2
+`);
+check('Height and HeightBelow parse', tall.errors.length === 0 &&
+  tall.board!.height === 14 && tall.board!.heightBelow === 2, JSON.stringify(tall.errors));
+check('Height below Thickness is rejected',
+  parseBoardFile('[board]\nName,x\nSize,10,10\nThickness,1.6\nHeight,1\n[mounts]\n1,1,1\n')
+    .errors.some((e) => /Height/.test(e.reason)));
+
+// floor, components up, 6mm standoffs: the board's underside sits at 2.5+6=8.5,
+// HeightBelow hangs 2 under that, Height 14 rises from it.
+const fe = boardEnvelope({ ...mk('floor', 'up'), x: 10, y: 20, standoffHeight: 6 }, tall.board!, BOX, LID);
+check('floor board footprint', near3([...fe.min.slice(0, 2), ...fe.max.slice(0, 2)], [-50, -18.5, 0, 11.5]),
+  JSON.stringify([fe.min, fe.max]));
+check('floor board spans 6.5 .. 22.5 in Z', near3([fe.min[2], fe.max[2]], [6.5, 22.5]),
+  `${fe.min[2]}..${fe.max[2]}`);
+
+// lid, components up, 2.6mm standoffs: the plate underside rests on the rim at
+// z=76, so the board's COMPONENT face is at 73.4 and Height rises toward the lid.
+const shallow = parseBoardFile(`[board]
+Name, OLEDish
+Size, 50, 30
+Thickness, 1.6
+Height, 5
+HeightBelow, 2
+[mounts]
+3, 3, 2.2
+`);
+const le = boardEnvelope({ ...mk('lid', 'up'), x: 60, y: 30, standoffHeight: 2.6 }, shallow.board!, BOX, LID);
+check('lid board draws in the lid frame', le.frame === 'lid');
+// world 69.8 .. 76.8, less the lid frame shift of (76 - 4) = 72
+check('lid board Z is converted to lid-local', near3([le.min[2], le.max[2]], [-2.2, 4.8]),
+  `${le.min[2]}..${le.max[2]}`);
+
+console.log('\n[18] interference detection');
+check('the battery clashes with a board sat on top of it',
+  envelopesOverlap(bat, boardEnvelope({ ...mk('floor','up'), x: 40, y: 20, standoffHeight: 6 }, tall.board!, BOX, LID)));
+check('the wall buzzer does not clash with that board',
+  !envelopesOverlap(buz, boardEnvelope({ ...mk('floor','up'), x: 40, y: 20, standoffHeight: 6 }, tall.board!, BOX, LID)));
+check('touching faces do not count as a clash',
+  !envelopesOverlap(obj('floor, 10, 10, 20, 20, 10, 0, A'), obj('floor, 30, 10, 20, 20, 10, 0, B')));
+check('a 1mm overlap does count',
+  envelopesOverlap(obj('floor, 10, 10, 20, 20, 10, 0, A'), obj('floor, 29, 10, 20, 20, 10, 0, B')));
 
 console.log(`\n${failures === 0 ? 'ALL CHECKS PASSED' : failures + ' CHECK(S) FAILED'}\n`);

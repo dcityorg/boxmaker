@@ -40,6 +40,7 @@ export interface DesignFile {
    */
   boardsText?: string;
   boardLibrary?: BoardDefinition[];
+  objectsText?: string;
   customFont?: {
     name: string;
     /** Base64-encoded TTF/OTF bytes. */
@@ -105,6 +106,7 @@ export function buildDesignFile(args: {
    */
   boardsText?: string;
   boardLibrary?: BoardDefinition[];
+  objectsText?: string;
   customFont?: { name: string; buffer: ArrayBuffer } | null;
 }): DesignFile {
   const file: DesignFile = {
@@ -122,6 +124,7 @@ export function buildDesignFile(args: {
   // boards stay byte-identical to what earlier versions produced.
   if (args.boardsText) file.boardsText = args.boardsText;
   if (args.boardLibrary && args.boardLibrary.length > 0) file.boardLibrary = args.boardLibrary;
+  if (args.objectsText) file.objectsText = args.objectsText;
   if (args.customFont) {
     file.customFont = {
       name: args.customFont.name,

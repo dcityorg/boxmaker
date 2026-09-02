@@ -17,7 +17,7 @@ import type {
  * Sectioned plain text. Section headers are `[name]` on their own line; body
  * lines are comma-delimited in the same style as the app's textareas.
  *
- *   [board]      Name / Size / Thickness / CornerRadius key-value lines
+ *   [board]      Name / Size / Thickness / CornerRadius / Height / HeightBelow
  *   [mounts]     X, Y, BoardHoleDia
  *   [cutouts]    Side, Shape, X, Y, <shape args>, Clearance
  *   [edges]      Edge, Pos, Z, SizeAlong, SizeZ, CornerRadius, Clearance
@@ -46,6 +46,8 @@ export function parseBoardFile(text: string): {
   let sizeY: number | null = null;
   let thickness = 1.6;
   let cornerRadius = 0;
+  let height = 0;        // 0 = not measured; treated as a bare PCB
+  let heightBelow = 0;
 
   let section: string | null = null;
   const lines = text.split('\n');
@@ -93,7 +95,12 @@ export function parseBoardFile(text: string): {
           } else {
             [sizeX, sizeY] = nums;
           }
-        } else if (key === 'thickness' || key === 'cornerradius') {
+        } else if (
+          key === 'thickness' ||
+          key === 'cornerradius' ||
+          key === 'height' ||
+          key === 'heightbelow'
+        ) {
           const nums = numbers(tokens.slice(1));
           if (tokens.length !== 2 || nums === null) {
             errors.push({ line: lineNo, reason: `expected ${tokens[0]}, <value>` });
@@ -101,13 +108,17 @@ export function parseBoardFile(text: string): {
             errors.push({ line: lineNo, reason: `${tokens[0]} cannot be negative` });
           } else if (key === 'thickness') {
             thickness = nums[0];
-          } else {
+          } else if (key === 'cornerradius') {
             cornerRadius = nums[0];
+          } else if (key === 'height') {
+            height = nums[0];
+          } else {
+            heightBelow = nums[0];
           }
         } else {
           errors.push({
             line: lineNo,
-            reason: `unknown [board] key "${tokens[0]}" (Name, Size, Thickness, CornerRadius)`,
+            reason: `unknown [board] key "${tokens[0]}" (Name, Size, Thickness, CornerRadius, Height, HeightBelow)`,
           });
         }
         break;
@@ -217,6 +228,12 @@ export function parseBoardFile(text: string): {
   if (name === null) errors.push({ line: 0, reason: '[board] Name is required' });
   if (sizeX === null || sizeY === null) errors.push({ line: 0, reason: '[board] Size is required' });
   if (mounts.length === 0) errors.push({ line: 0, reason: 'at least one [mounts] hole is required' });
+  if (height > 0 && height < thickness) {
+    errors.push({
+      line: 0,
+      reason: `Height (${height}) is less than Thickness (${thickness}) -- Height is measured from the NON-component face, so it includes the board itself`,
+    });
+  }
 
   if (errors.length > 0) return { board: null, errors };
 
@@ -227,6 +244,8 @@ export function parseBoardFile(text: string): {
       sizeY: sizeY as number,
       thickness,
       cornerRadius,
+      height,
+      heightBelow,
       mounts,
       cutouts,
       edges,

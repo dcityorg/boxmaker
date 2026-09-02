@@ -13,6 +13,7 @@ import { BoxControls } from '@/components/parameters/BoxControls';
 import { LidControls } from '@/components/parameters/LidControls';
 import { SnapFitControls } from '@/components/parameters/SnapFitControls';
 import { BoardsControls } from '@/components/parameters/BoardsControls';
+import { ObjectsControls } from '@/components/parameters/ObjectsControls';
 import { StandoffsControls } from '@/components/parameters/StandoffsControls';
 import { CutoutsControls } from '@/components/parameters/CutoutsControls';
 import { TextLabelsControls } from '@/components/parameters/TextLabelsControls';
@@ -489,8 +490,9 @@ export function Sidebar({ helpOpen, onToggleHelp, undo, redo, canUndo, canRedo }
           <LidControls />
           <SnapFitControls />
 
-          <GroupHeader label="Boards" color={GROUP_COLORS.boards} />
+          <GroupHeader label="Boards & Objects" color={GROUP_COLORS.boards} />
           <BoardsControls />
+          <ObjectsControls />
 
           <GroupHeader label="Standoffs" color={GROUP_COLORS.standoffs} />
           <StandoffsControls />

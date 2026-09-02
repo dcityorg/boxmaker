@@ -198,6 +198,8 @@ Name, Adafruit Feather ESP32-S3
 Size, 50.80, 22.86            // X, Y
 Thickness, 1.60
 CornerRadius, 1.5
+Height, 12.0                   // total above the NON-component face, stack included
+HeightBelow, 2.0               // OPTIONAL: anything protruding below, e.g. leads
 
 [mounts]                       // X, Y, BoardHoleDia
 2.54, 2.54, 2.5
@@ -289,6 +291,44 @@ from `boardZToWorldZ`, which accounts for the board resting on the standoffs' fr
 which rise from the floor, or hang below the lid plate where it sits on the box rim at
 `box.height`.
 
+### 4.4 Clearance: `Height`, `HeightBelow` and `[objects]`
+
+Added 2026-09-02 (phase 1.5), ahead of the rest of phase 2, because knowing what fits is
+what a real build needs first.
+
+**`Height`** in `[board]` is the total height of the assembly above board `Z = 0`, i.e.
+above the **non-component face**. It includes the board itself and everything standing on
+it, so a carrier with two more boards stacked on it reports the whole stack as one number.
+`0` means "not measured", and the board is treated as a bare PCB of `Thickness`. A `Height`
+below `Thickness` is rejected, since that almost always means it was measured from the
+wrong face.
+
+**`HeightBelow`** is how far anything protrudes below `Z = 0` -- through-hole leads, a
+connector on the solder side. Default 0. It matters because it is what hits the mounting
+surface when the standoffs are too short.
+
+**Objects** are the non-printed occupants: a battery, a speaker, a relay. They live in
+their own design-level textarea, not in a board file, because they belong to this box.
+
+```
+// Surface, X, Y, SizeX, SizeY, Depth, Offset, Name
+floor, 30, 20, 60, 35, 18, 0, LiPo battery
+left,  40, 25, 55, 30, 12, 0, Battery velcroed to the wall
+```
+
+The design decision worth recording: **an object anchors to one of the six surfaces and
+uses THAT SURFACE'S existing user frame** -- the same one its cutouts use -- rather than a
+new box-wide XYZ. `Depth` runs inward from the surface, `Offset` holds it clear of the
+surface. A battery on the floor is `floor`; the same battery stuck to a wall is `left`,
+whose frame already measures height up from the interior floor, so there is no new
+coordinate system to learn and no second set of frames to keep correct.
+
+`X,Y` is the **centre**, matching `[cutouts]` and `[keepouts]`.
+
+**Objects are advisory only.** They never add or subtract material and never appear in an
+export, which makes them safe to add to a finished design. Their only jobs are to be drawn
+and to be checked for interference.
+
 ## 5. Board library
 
 Same shape as the existing `src/data/presets.ts`:
@@ -339,21 +379,29 @@ not contain it.
 
 ---
 
-## 8. Ghost board preview
+## 8. Clearance ghosts
 
-New `src/components/viewport/BoardGhost.tsx`, mounted in `Viewport.tsx` right after
-`<WarningMarkers />` (`:290`).
+`src/components/viewport/ClearanceGhosts.tsx` draws a translucent box for every placed
+board (sized by `Height` / `HeightBelow`) and every object. Toggled by
+Settings -> Show Clearance, default on.
 
-- Copy the `WarningMarkers.tsx` material recipe verbatim -- `transparent`,
-  `depthWrite={false}` (`:41-48`). That is what avoids sorting artifacts against the
-  solid box.
-- Use a plain three `boxGeometry` slab, **not** a manifold build, so dragging a placement
-  slider does not trigger a CSG rebuild.
-- Apply `lidAssembledOffset(box)` when `view === 'assembled'` and the board is
-  lid-mounted, exactly as `WarningMarkers.tsx:36-39` and `OriginMarkers.tsx:128` do.
-- Render `[keepouts]` as fainter slabs on top of the board.
+- **Teal** for a board, matching the sidebar group; **slate** for an object; **red** for
+  anything overlapping something else. Deliberately cool-toned so they never read as the
+  red warning ghosts, which mean something is wrong -- these are furniture.
+- `depthTest={false}`, which `WarningMarkers` does NOT do. These live inside a solid box
+  and would otherwise be hidden by its own walls, which defeats the point entirely.
+  Drawing them over the top gives an x-ray view of the box's contents without having to
+  explode it.
+- Plain three `boxGeometry`, never a manifold build, so dragging a slider costs nothing.
+- A lid-mounted item is drawn in the lid frame and follows the lid when the viewport
+  explodes it, the same way `WarningMarkers.tsx:36-39` handles lid ghosts. Interference is
+  still compared in **assembled** coordinates, because a lid-mounted board and a floor
+  object certainly can collide.
 
----
+The maths lives in `src/board/envelopes.ts`, which is deliberately pure with type-only
+imports so `npm run check:board` can run it under node. The React hook that feeds the
+viewport is separate, in `useEnvelopes.ts` -- putting it beside the maths dragged Zustand
+into a plain node process and broke the check.
 
 ## 9. Coordinate math: reuse, do not refactor
 
@@ -517,13 +565,27 @@ The auto-clamp is phase 2.
 - [ ] "Explode to raw lines" escape hatch.
 - [ ] Help panel section; persistence, undo and autosave wiring.
 
+### Phase 1.5 -- clearance (done 2026-09-02)
+
+Pulled ahead of phase 2 at Gary's request: he has a box being built now, with a stacked
+board and a battery that must not collide.
+
+- [x] `Height` and `HeightBelow` in the board file (section 4.4).
+- [x] `[objects]` textarea, surface-anchored, with its own sidebar section under a renamed
+      "Boards & Objects" group.
+- [x] `envelopes.ts` -- world-space AABBs for both, exact rather than approximate because
+      rotation is restricted to quarter turns and objects are rectangular.
+- [x] Translucent x-ray ghosts, red on overlap, Settings -> Show Clearance.
+- [x] 18 acceptance checks against hand-computed envelopes and overlap cases.
+- [ ] Interference reported as text warnings, not only as colour.
+
 ### Phase 2 -- validation and preview
 
 Connector cutouts moved into phase 1. What is left is everything that tells the user their
 board does not fit.
 
 - [ ] `boardWarnings()` in `validation/checks.ts`, plus its viewport ghosts (section 7).
-- [ ] Ghost board preview and keepout slabs (section 8).
+- [ ] Keepout slabs in the ghost view (section 8 covers the board envelope already).
 - [ ] Warning when a projected connector cutout misses its wall or crosses a corner.
 - [ ] Warning when a compiled cutout falls outside its target surface.
 - [x] Fillet handling settled -- auto-clamp rejected, exterior-breakthrough advisory
