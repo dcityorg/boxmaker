@@ -3,6 +3,7 @@
 import type {
   AppearanceSettings,
   BoxParams,
+  DesignState,
   LidParams,
   SnapFitParams,
 } from './useDesign';
@@ -180,4 +181,55 @@ export function designFromUrlHash(hash: string): DesignFile {
   const b64 = hash.replace(/-/g, '+').replace(/_/g, '/').replace(/~/g, '=');
   const json = atob(b64);
   return parseDesignFile(json);
+}
+
+/* -------------------------------------------------------------------------- */
+/*  The one place that decides what a design file contains                     */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Every field of the store that gets persisted.
+ *
+ * This type is the point: a new persisted field added to DesignState makes
+ * every caller of designFileFromState fail to compile until it is handled here,
+ * once. Listing the fields at each call site instead is what silently dropped
+ * boards and objects from Save Design and Share Link while autosave kept them --
+ * three copies, one updated.
+ */
+export type PersistedState = Pick<
+  DesignState,
+  | 'designName'
+  | 'appearance'
+  | 'box'
+  | 'lid'
+  | 'snap'
+  | 'standoffsText'
+  | 'cutoutsText'
+  | 'textLabelsText'
+  | 'boardsText'
+  | 'boardLibrary'
+  | 'objectsText'
+  | 'objectLibrary'
+>;
+
+/** Build a DesignFile straight from store state. Use this, not buildDesignFile. */
+export function designFileFromState(
+  s: PersistedState,
+  customFont?: { name: string; buffer: ArrayBuffer } | null
+): DesignFile {
+  return buildDesignFile({
+    designName: s.designName,
+    appearance: s.appearance,
+    box: s.box,
+    lid: s.lid,
+    snap: s.snap,
+    standoffsText: s.standoffsText,
+    cutoutsText: s.cutoutsText,
+    textLabelsText: s.textLabelsText,
+    boardsText: s.boardsText,
+    boardLibrary: s.boardLibrary,
+    objectsText: s.objectsText,
+    objectLibrary: s.objectLibrary,
+    customFont: customFont ?? null,
+  });
 }

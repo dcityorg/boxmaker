@@ -27,7 +27,7 @@ import {
   clearCustomFonts,
 } from '@/geometry/text';
 import {
-  buildDesignFile,
+  designFileFromState,
   parseDesignFile,
   base64ToBuffer,
   designToUrlHash,
@@ -84,17 +84,7 @@ export function Sidebar({ helpOpen, onToggleHelp, undo, redo, canUndo, canRedo }
   const handleSaveDesign = useCallback(() => {
     try {
       const s = useDesign.getState();
-      const file = buildDesignFile({
-        designName: s.designName,
-        appearance: s.appearance,
-        box: s.box,
-        lid: s.lid,
-        snap: s.snap,
-        standoffsText: s.standoffsText,
-        cutoutsText: s.cutoutsText,
-        textLabelsText: s.textLabelsText,
-        customFont: getActiveCustomFont(),
-      });
+      const file = designFileFromState(s, getActiveCustomFont());
       const json = JSON.stringify(file, null, 2);
       const enc = new TextEncoder();
       const baseName = (s.designName || 'boxmaker').replace(/[^a-z0-9-_]+/gi, '-');
@@ -109,17 +99,8 @@ export function Sidebar({ helpOpen, onToggleHelp, undo, redo, canUndo, canRedo }
   const handleShareLink = useCallback(async () => {
     try {
       const s = useDesign.getState();
-      const file = buildDesignFile({
-        designName: s.designName,
-        appearance: s.appearance,
-        box: s.box,
-        lid: s.lid,
-        snap: s.snap,
-        standoffsText: s.standoffsText,
-        cutoutsText: s.cutoutsText,
-        textLabelsText: s.textLabelsText,
-        customFont: null, // URLs can't hold custom font bytes
-      });
+      // Custom font bytes are stripped from share links by designToUrlHash.
+      const file = designFileFromState(s, null);
       const hash = designToUrlHash(file);
       const url = `${window.location.origin}${window.location.pathname}#design=${hash}`;
       const hasCustomFont = !!getActiveCustomFont();

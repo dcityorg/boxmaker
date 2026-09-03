@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import * as opentype from 'opentype.js';
 import { useDesign } from './useDesign';
-import { buildDesignFile, parseDesignFile, designFromUrlHash } from './persistence';
+import { designFileFromState, parseDesignFile, designFromUrlHash } from './persistence';
 import { idbLoadCustomFont } from './fontCache';
 import { registerCustomFont } from '@/geometry/text';
 
@@ -83,21 +83,8 @@ export function useAutoSave() {
       if (writeTimerRef.current !== null) window.clearTimeout(writeTimerRef.current);
       writeTimerRef.current = window.setTimeout(() => {
         try {
-          const file = buildDesignFile({
-            designName: s.designName,
-            appearance: s.appearance,
-            box: s.box,
-            lid: s.lid,
-            snap: s.snap,
-            standoffsText: s.standoffsText,
-            cutoutsText: s.cutoutsText,
-            textLabelsText: s.textLabelsText,
-            boardsText: s.boardsText,
-            boardLibrary: s.boardLibrary,
-            objectsText: s.objectsText,
-            objectLibrary: s.objectLibrary,
-            customFont: null, // intentionally omitted -- per-session only
-          });
+          // customFont is intentionally omitted -- per-session only.
+          const file = designFileFromState(s, null);
           localStorage.setItem(LS_KEY, JSON.stringify(file));
         } catch (err) {
           console.warn('[BoxMaker] localStorage save failed:', err);
