@@ -451,8 +451,6 @@ export function parseCutoutsText(text: string): {
  * Lines starting with `//` (after trimming) are comments. Errors are
  * collected with line numbers so the UI can flag them inline.
  */
-export { parseObjectsText };
-
 export function parseStandoffsText(text: string): {
   standoffs: StandoffParams[];
   errors: StandoffParseError[];
@@ -495,13 +493,14 @@ export function parseStandoffsText(text: string): {
 }
 
 import { parseBoardsText } from '@/board/parsePlacements';
-import { parseObjectsText } from '@/board/parseObjects';
+import { parseObjectPlacementsText } from '@/board/parseObjectPlacements';
 import type {
   BoardDefinition,
   BoardPlacement,
   BoardPlacementParseError,
-  BoxObjectParams,
-  BoxObjectParseError,
+  ObjectDefinition,
+  ObjectPlacement,
+  ObjectPlacementParseError,
 } from '@/board/types';
 
 export interface AppearanceSettings {
@@ -539,10 +538,15 @@ export interface DesignState {
   boards: BoardPlacement[];
   boardErrors: BoardPlacementParseError[];
   boardLibrary: BoardDefinition[];
-  /** Non-printed occupants -- batteries, speakers. Advisory only, never geometry. */
+  /**
+   * Non-printed occupants -- batteries, potentiometers, speakers. Defined in
+   * their own reusable files, exactly like boards; only their cutouts become
+   * geometry, never their bodies.
+   */
   objectsText: string;
-  objects: BoxObjectParams[];
-  objectErrors: BoxObjectParseError[];
+  objects: ObjectPlacement[];
+  objectErrors: ObjectPlacementParseError[];
+  objectLibrary: ObjectDefinition[];
 
   setDesignName: (name: string | null) => void;
   setAppearance: (patch: Partial<AppearanceSettings>) => void;
@@ -558,6 +562,8 @@ export interface DesignState {
   setTextLabelsText: (text: string) => void;
   setBoardsText: (text: string) => void;
   setObjectsText: (text: string) => void;
+  addObjectToLibrary: (obj: ObjectDefinition) => void;
+  removeObjectFromLibrary: (name: string) => void;
   /** Add or replace a board definition by name (case-insensitive). */
   addBoardToLibrary: (board: BoardDefinition) => void;
   removeBoardFromLibrary: (name: string) => void;
@@ -642,6 +648,7 @@ export const useDesign = create<DesignState>((set) => ({
   objectsText: DEFAULT_OBJECTS_TEXT,
   objects: [],
   objectErrors: [],
+  objectLibrary: [],
 
   setDesignName: (name) => set({ designName: name }),
   setAppearance: (patch) =>
@@ -670,9 +677,23 @@ export const useDesign = create<DesignState>((set) => ({
     set({ boardsText: text, boards: placements, boardErrors: errors, isDirty: true });
   },
   setObjectsText: (text) => {
-    const { objects, errors } = parseObjectsText(text);
-    set({ objectsText: text, objects, objectErrors: errors, isDirty: true });
+    const { placements, errors } = parseObjectPlacementsText(text);
+    set({ objectsText: text, objects: placements, objectErrors: errors, isDirty: true });
   },
+  addObjectToLibrary: (obj) =>
+    set((s) => {
+      const k = obj.name.trim().toLowerCase();
+      const rest = s.objectLibrary.filter((o) => o.name.trim().toLowerCase() !== k);
+      return { objectLibrary: [...rest, obj], isDirty: true };
+    }),
+  removeObjectFromLibrary: (name) =>
+    set((s) => {
+      const k = name.trim().toLowerCase();
+      return {
+        objectLibrary: s.objectLibrary.filter((o) => o.name.trim().toLowerCase() !== k),
+        isDirty: true,
+      };
+    }),
   addBoardToLibrary: (board) =>
     set((s) => {
       const k = board.name.trim().toLowerCase();
@@ -710,6 +731,7 @@ export const useDesign = create<DesignState>((set) => ({
       objectsText: DEFAULT_OBJECTS_TEXT,
       objects: [],
       objectErrors: [],
+      objectLibrary: [],
       isDirty: false,
     }),
   loadDesign: (design) => {
@@ -719,7 +741,7 @@ export const useDesign = create<DesignState>((set) => ({
     // Boards are optional in the file: designs saved before the feature
     // existed have neither field, and must still load.
     const boardsParse = parseBoardsText(design.boardsText ?? DEFAULT_BOARDS_TEXT);
-    const objectsParse = parseObjectsText(design.objectsText ?? DEFAULT_OBJECTS_TEXT);
+    const objectsParse = parseObjectPlacementsText(design.objectsText ?? DEFAULT_OBJECTS_TEXT);
     set({
       designName: design.designName,
       // Merge with DEFAULT_APPEARANCE so older JSONs (saved before a field
@@ -743,8 +765,9 @@ export const useDesign = create<DesignState>((set) => ({
       boardErrors: boardsParse.errors,
       boardLibrary: design.boardLibrary ?? [],
       objectsText: design.objectsText ?? DEFAULT_OBJECTS_TEXT,
-      objects: objectsParse.objects,
+      objects: objectsParse.placements,
       objectErrors: objectsParse.errors,
+      objectLibrary: design.objectLibrary ?? [],
       isDirty: false,
     });
   },

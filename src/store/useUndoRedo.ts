@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useDesign, parseStandoffsText, parseCutoutsText, parseTextLabelsText, type DesignState } from './useDesign';
 import { parseBoardsText } from '@/board/parsePlacements';
-import { parseObjectsText } from './useDesign';
+import { parseObjectPlacementsText } from '@/board/parseObjectPlacements';
 
 /**
  * Snapshot fields tracked by undo/redo. Excludes derived state (parsed
@@ -22,6 +22,7 @@ type Snapshot = Pick<DesignState,
   | 'boardsText'
   | 'boardLibrary'
   | 'objectsText'
+  | 'objectLibrary'
 >;
 
 function snapshot(s: DesignState): Snapshot {
@@ -38,6 +39,7 @@ function snapshot(s: DesignState): Snapshot {
     // Shallow copy: definitions are replaced wholesale, never mutated.
     boardLibrary: [...s.boardLibrary],
     objectsText: s.objectsText,
+    objectLibrary: [...s.objectLibrary],
   };
 }
 
@@ -48,6 +50,7 @@ function snapshotEquals(a: Snapshot, b: Snapshot): boolean {
   if (a.textLabelsText !== b.textLabelsText) return false;
   if (a.boardsText !== b.boardsText) return false;
   if (a.objectsText !== b.objectsText) return false;
+  if (JSON.stringify(a.objectLibrary) !== JSON.stringify(b.objectLibrary)) return false;
   if (JSON.stringify(a.boardLibrary) !== JSON.stringify(b.boardLibrary)) return false;
   // Object fields: JSON compare. Cheap enough for the small param objects.
   if (JSON.stringify(a.appearance) !== JSON.stringify(b.appearance)) return false;
@@ -105,7 +108,7 @@ export function useUndoRedo() {
     const cutoutsParse = parseCutoutsText(s.cutoutsText);
     const textLabelsParse = parseTextLabelsText(s.textLabelsText);
     const boardsParse = parseBoardsText(s.boardsText);
-    const objectsParse = parseObjectsText(s.objectsText);
+    const objectsParse = parseObjectPlacementsText(s.objectsText);
     useDesign.setState({
       designName: s.designName,
       appearance: { ...s.appearance },
@@ -126,8 +129,9 @@ export function useUndoRedo() {
       boardErrors: boardsParse.errors,
       boardLibrary: [...s.boardLibrary],
       objectsText: s.objectsText,
-      objects: objectsParse.objects,
+      objects: objectsParse.placements,
       objectErrors: objectsParse.errors,
+      objectLibrary: [...s.objectLibrary],
       isDirty: true,
     });
     lastSnapRef.current = s;

@@ -6,7 +6,7 @@ import type {
   LidParams,
   SnapFitParams,
 } from './useDesign';
-import type { BoardDefinition } from '@/board/types';
+import type { BoardDefinition, ObjectDefinition } from '@/board/types';
 
 /**
  * Persisted design file format. Bump VERSION + handle the old shape in
@@ -41,6 +41,7 @@ export interface DesignFile {
   boardsText?: string;
   boardLibrary?: BoardDefinition[];
   objectsText?: string;
+  objectLibrary?: ObjectDefinition[];
   customFont?: {
     name: string;
     /** Base64-encoded TTF/OTF bytes. */
@@ -107,6 +108,7 @@ export function buildDesignFile(args: {
   boardsText?: string;
   boardLibrary?: BoardDefinition[];
   objectsText?: string;
+  objectLibrary?: ObjectDefinition[];
   customFont?: { name: string; buffer: ArrayBuffer } | null;
 }): DesignFile {
   const file: DesignFile = {
@@ -125,6 +127,7 @@ export function buildDesignFile(args: {
   if (args.boardsText) file.boardsText = args.boardsText;
   if (args.boardLibrary && args.boardLibrary.length > 0) file.boardLibrary = args.boardLibrary;
   if (args.objectsText) file.objectsText = args.objectsText;
+  if (args.objectLibrary && args.objectLibrary.length > 0) file.objectLibrary = args.objectLibrary;
   if (args.customFont) {
     file.customFont = {
       name: args.customFont.name,

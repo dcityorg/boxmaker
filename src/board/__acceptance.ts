@@ -14,9 +14,11 @@ import type { BoxParams, LidParams } from '@/store/useDesign';
 import { parseBoardFile } from './parseBoard';
 import { parseBoardsText } from './parsePlacements';
 import { compileBoard, convertFrame, isMirrored, targetSurface, boardToSurface, wallFacedBy, boardZToWorldZ } from './compile';
-import type { BoardEdge, BoardPlacement, BoxObjectParams } from './types';
+import type { BoardEdge, BoardPlacement, ObjectPlacement } from './types';
 import { boardEnvelope, objectEnvelope, envelopesOverlap } from './envelopes';
-import { parseObjectsText } from './parseObjects';
+import { parseObjectFile } from './parseObject';
+import { parseObjectPlacementsText } from './parseObjectPlacements';
+import { compileObject } from './compileObject';
 
 const BOX: BoxParams = {
   mode: 'exterior', length: 125, width: 82, height: 76,
@@ -289,28 +291,75 @@ check('lid+down: non-component face on the standoff at 70', near(zAt('lid', 'dow
 
 
 // ------------------------------------------------------- clearance envelopes
-console.log('\n[16] object envelopes, hand-computed');
-const obj = (line: string) => {
-  const { objects, errors } = parseObjectsText(line);
-  if (errors.length) throw new Error(JSON.stringify(errors));
-  return objectEnvelope(objects[0], BOX, LID);
-};
 const near3 = (a: number[], b: number[]) => a.every((v, i) => near(v, b[i], 1e-9));
 
-// floor: world XY = (-60 + x, -38.5 + y); Z starts at the floor's top face 2.5
-const bat = obj('floor, 30, 20, 40, 25, 15, 0, LiPo battery');
-check('floor object min', near3(bat.min, [-50, -31, 2.5]), JSON.stringify(bat.min));
-check('floor object max', near3(bat.max, [-10, -6, 17.5]), JSON.stringify(bat.max));
-check('floor object draws in the box frame', bat.frame === 'box');
+console.log('\n[16] objects are reusable files, like boards');
+// Gary's potentiometer: a 16x16x22 body with a 7mm shaft hole out its BASE --
+// the face against whatever it is mounted to.
+const POT = `
+// 10k panel potentiometer
+[object]
+Name, Pot 10k
+Size, 16, 16, 22          // X, Y across the mounting face; Z away from it
 
-// left wall: interior face at x = -60, grows +X; along-wall runs +Y;
-// height is measured UP FROM THE INTERIOR FLOOR, so z = 2.5 + y
-const buz = obj('left, 45, 22, 30, 18, 10, 2, Buzzer');
-check('wall object honours Offset (2mm off the wall)', near(buz.min[0], -58, 1e-9), `${buz.min[0]}`);
-check('wall object depth reaches 12mm in', near(buz.max[0], -48, 1e-9), `${buz.max[0]}`);
-check('wall object spans the wall correctly', near3([buz.min[1], buz.max[1]], [-8.5, 21.5]));
-check('wall object height is above the INTERIOR floor', near3([buz.min[2], buz.max[2]], [15.5, 33.5]),
-  `${buz.min[2]}..${buz.max[2]}`);
+[cutouts]                  // Face, Shape, X, Y, Z, <args>, Clearance
+base, Round, 8, 8, 0, 7, 0.4
+`;
+const pot = parseObjectFile(POT);
+check('object file parses', pot.errors.length === 0, JSON.stringify(pot.errors));
+check('name, size and one cutout',
+  pot.object!.name === 'Pot 10k' && pot.object!.sizeZ === 22 && pot.object!.cutouts.length === 1);
+
+const op = parseObjectPlacementsText('left, 30, 20, 0, 0, Pot 10k');
+check('placement parses', op.errors.length === 0 && op.placements.length === 1, JSON.stringify(op.errors));
+check('placement rejects a non-quarter turn',
+  parseObjectPlacementsText('left, 30, 20, 45, 0, Pot').errors.length === 1);
+
+console.log('\n[16b] ACCEPTANCE: the pot on a wall, shaft out that wall');
+// left basis: origin (-60, -38.5, 2.5), u=+Y, v=+Z, n=+X.
+// A `base` feature points at -n, i.e. -X, so it exits the LEFT wall.
+// Feature (8,8,0) -> along-wall 30+8 = 38, height 20+8 = 28. Dia 7 + 0.8 = 7.8.
+const potOut = compileObject(op.placements[0], pot.object!, BOX, LID);
+check('no compile errors', potOut.errors.length === 0, JSON.stringify(potOut.errors));
+check('the shaft cuts the LEFT wall', potOut.cutouts[0].surface === 'left', `got ${potOut.cutouts[0].surface}`);
+check('round, at 38 / 28', potOut.cutouts[0].kind === 'round' &&
+  near(potOut.cutouts[0].x, 38, 1e-9) && near(potOut.cutouts[0].y, 28, 1e-9),
+  `${potOut.cutouts[0].x}, ${potOut.cutouts[0].y}`);
+check('diameter grown by clearance to 7.8',
+  near((potOut.cutouts[0] as { diameter: number }).diameter, 7.8, 1e-9));
+
+console.log('\n[16c] ACCEPTANCE: the SAME file on the floor, shaft out the lid');
+// Only the placement changes. A `top` feature points along +n, which on the
+// floor is +Z, so it exits through the LID -- a different surface, a different
+// frame, no edit to the object file.
+const potUp = parseObjectFile(POT.replace('base, Round, 8, 8, 0,', 'top, Round, 8, 8, 22,'));
+const upOut = compileObject(
+  { surface: 'floor', x: 20, y: 30, rotation: 0, offset: 0, objectName: 'Pot 10k' },
+  potUp.object!, BOX, LID
+);
+check('cuts the LID', upOut.cutouts[0].surface === 'lid', `got ${upOut.cutouts[0].surface}`);
+// world (-32, -0.5, 24.5); lid origin (57.3, -35.8, 76), u = -X, v = +Y
+check('projected into the lid frame at 89.3 / 35.3',
+  near(upOut.cutouts[0].x, 89.3, 1e-9) && near(upOut.cutouts[0].y, 35.3, 1e-9),
+  `${upOut.cutouts[0].x}, ${upOut.cutouts[0].y}`);
+
+console.log('\n[16d] rotation moves the hole, not the object file');
+const spun = compileObject(
+  { surface: 'floor', x: 20, y: 30, rotation: 90, offset: 0, objectName: 'Pot 10k' },
+  parseObjectFile(POT).object!, BOX, LID
+);
+// base on the floor exits the FLOOR; (8,8) turned 90 CCW is (-8,8)
+check('base on the floor cuts the FLOOR', spun.cutouts[0].surface === 'floor');
+check('quarter turn puts it at 12 / 38',
+  near(spun.cutouts[0].x, 12, 1e-9) && near(spun.cutouts[0].y, 38, 1e-9),
+  `${spun.cutouts[0].x}, ${spun.cutouts[0].y}`);
+
+console.log('\n[16e] object envelopes');
+const potEnv = objectEnvelope(op.placements[0], pot.object!, BOX, LID)!;
+check('wall-mounted pot occupies the right volume',
+  near3(potEnv.min, [-60, -8.5, 22.5]) && near3(potEnv.max, [-38, 7.5, 38.5]),
+  JSON.stringify([potEnv.min, potEnv.max]));
+check('it grows AWAY from the wall it is stuck to', near(potEnv.max[0] - potEnv.min[0], 22, 1e-9));
 
 console.log('\n[17] board envelopes use Height / HeightBelow');
 const tall = parseBoardFile(`[board]
@@ -354,13 +403,18 @@ check('lid board Z is converted to lid-local', near3([le.min[2], le.max[2]], [-2
   `${le.min[2]}..${le.max[2]}`);
 
 console.log('\n[18] interference detection');
-check('the battery clashes with a board sat on top of it',
-  envelopesOverlap(bat, boardEnvelope({ ...mk('floor','up'), x: 40, y: 20, standoffHeight: 6 }, tall.board!, BOX, LID)));
-check('the wall buzzer does not clash with that board',
-  !envelopesOverlap(buz, boardEnvelope({ ...mk('floor','up'), x: 40, y: 20, standoffHeight: 6 }, tall.board!, BOX, LID)));
+const boardAt = (x: number, y: number) =>
+  boardEnvelope({ ...mk('floor', 'up'), x, y, standoffHeight: 6 }, tall.board!, BOX, LID);
+const potAt = (surface: ObjectPlacement['surface'], x: number, y: number) =>
+  objectEnvelope({ surface, x, y, rotation: 0, offset: 0, objectName: 'Pot 10k' }, pot.object!, BOX, LID)!;
+
+check('a board sitting on top of an object clashes',
+  envelopesOverlap(potAt('floor', 20, 30), boardAt(20, 30)));
+check('the same object moved clear does not',
+  !envelopesOverlap(potAt('floor', 100, 5), boardAt(20, 30)));
 check('touching faces do not count as a clash',
-  !envelopesOverlap(obj('floor, 10, 10, 20, 20, 10, 0, A'), obj('floor, 30, 10, 20, 20, 10, 0, B')));
+  !envelopesOverlap(potAt('floor', 0, 0), potAt('floor', 16, 0)));
 check('a 1mm overlap does count',
-  envelopesOverlap(obj('floor, 10, 10, 20, 20, 10, 0, A'), obj('floor, 29, 10, 20, 20, 10, 0, B')));
+  envelopesOverlap(potAt('floor', 0, 0), potAt('floor', 15, 0)));
 
 console.log(`\n${failures === 0 ? 'ALL CHECKS PASSED' : failures + ' CHECK(S) FAILED'}\n`);

@@ -95,6 +95,7 @@ export function useAutoSave() {
             boardsText: s.boardsText,
             boardLibrary: s.boardLibrary,
             objectsText: s.objectsText,
+            objectLibrary: s.objectLibrary,
             customFont: null, // intentionally omitted -- per-session only
           });
           localStorage.setItem(LS_KEY, JSON.stringify(file));

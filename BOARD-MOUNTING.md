@@ -313,7 +313,7 @@ from `boardZToWorldZ`, which accounts for the board resting on the standoffs' fr
 which rise from the floor, or hang below the lid plate where it sits on the box rim at
 `box.height`.
 
-### 4.4 Clearance: `Height`, `HeightBelow` and `[objects]`
+### 4.4 Board clearance: `Height` and `HeightBelow`
 
 Added 2026-09-02 (phase 1.5), ahead of the rest of phase 2, because knowing what fits is
 what a real build needs first.
@@ -329,27 +329,69 @@ wrong face.
 connector on the solder side. Default 0. It matters because it is what hits the mounting
 surface when the standoffs are too short.
 
-**Objects** are the non-printed occupants: a battery, a speaker, a relay. They live in
-their own design-level textarea, not in a board file, because they belong to this box.
+### 4.5 Objects -- reusable non-printed parts
+
+Rebuilt 2026-09-02 (phase 1.6). Objects were first shipped as a single inline textarea
+line carrying its own dimensions. Gary asked for them to work like boards instead, so a
+part measured once -- his example was a panel potentiometer -- can move between projects,
+including the hole its shaft needs. That is plainly right: a pot's body and its shaft
+cutout belong to the pot, not to the box.
+
+**`*.object.txt`**
 
 ```
-// Surface, X, Y, SizeX, SizeY, Depth, Offset, Name
-floor, 30, 20, 60, 35, 18, 0, LiPo battery
-left,  40, 25, 55, 30, 12, 0, Battery velcroed to the wall
+// 10k panel potentiometer
+[object]
+Name, Pot 10k
+Size, 16, 16, 22           // X, Y across the mounting face; Z away from it
+
+[cutouts]                   // Face, Shape, X, Y, Z, <args>, Clearance
+base, Round, 8, 8, 0, 7, 0.4
 ```
 
-The design decision worth recording: **an object anchors to one of the six surfaces and
-uses THAT SURFACE'S existing user frame** -- the same one its cutouts use -- rather than a
-new box-wide XYZ. `Depth` runs inward from the surface, `Offset` holds it clear of the
-surface. A battery on the floor is `floor`; the same battery stuck to a wall is `left`,
-whose frame already measures height up from the interior floor, so there is no new
-coordinate system to learn and no second set of frames to keep correct.
+**Object-local frame:** `0,0,0` at a corner of the face that sits **against** the mounting
+surface. X and Y run across that face; `+Z` runs **away** from the surface, into the box.
+There is no component side and no flip -- an object is just a box, which is what makes it
+simpler than a board.
 
-`X,Y` is the **centre**, matching `[cutouts]` and `[keepouts]`.
+**Faces are object-local, and the box surface is derived.** `base` is the face against the
+mounting surface, `top` the opposite one, plus `x+ x- y+ y-`. The compiler rotates the
+face's outward normal into world space and cuts whichever surface faces back at it. So the
+*same file* puts the shaft through the left wall when the pot is on the left wall, and
+through the lid when it is on the floor -- with no edit. A wall is never named in an object
+file, which is exactly what makes the file portable.
 
-**Objects are advisory only.** They never add or subtract material and never appear in an
-export, which makes them safe to add to a finished design. Their only jobs are to be drawn
-and to be checked for interference.
+`X, Y, Z` is the hole's centre in object coordinates, all three axes. The axis
+perpendicular to the named face is **ignored** -- the cutout is an orthographic projection
+along that normal -- so write `0` or the face's own value, whichever reads better. Keeping
+all three makes every line the same shape. For a `Rect`, `Width` and `Height` run along the
+face's two free axes in X, Y, Z order: `base`/`top` are (X, Y), `x+`/`x-` are (Y, Z),
+`y+`/`y-` are (X, Z).
+
+**Placement**, in the design's objects textarea:
+
+```
+// Surface, X, Y, Rotation, Offset, ObjectName
+left, 30, 20, 0, 0, Pot 10k
+```
+
+`X,Y` is where the object's `0,0` **corner** lands, matching boards rather than the centre
+the first inline format used. `Offset` is the gap between the surface and the object's base
+face. Rotation is quarter turns, as everywhere else.
+
+**An object's BODY is never geometry** and never appears in an export -- it exists to be
+drawn and checked for interference. **Its cutouts ARE geometry:** a potentiometer shaft
+needs a real hole in a real wall.
+
+### 4.6 The six-surface basis
+
+`src/board/surfaces.ts` gives every surface an origin, two in-plane axes and an inward
+normal, so a point at user `(x, y)` standing `d` off the surface is `origin + u*x + v*y +
+n*d` whichever surface it is, and a world point projects back with two dot products.
+
+This is what makes objects work generically instead of needing a sixth hand-written copy of
+the per-surface table. The per-surface cases in `geometry/cutouts.ts:99-176` remain the
+authority and are untouched (section 9); this mirrors them.
 
 ## 5. Board library
 
@@ -423,7 +465,9 @@ Settings -> Show Clearance, default on.
 The maths lives in `src/board/envelopes.ts`, which is deliberately pure with type-only
 imports so `npm run check:board` can run it under node. The React hook that feeds the
 viewport is separate, in `useEnvelopes.ts` -- putting it beside the maths dragged Zustand
-into a plain node process and broke the check.
+into a plain node process and broke the check. An object's corners come from
+`compileObject.ts`, which already maps object coordinates into the world to place its
+holes.
 
 ## 9. Coordinate math: reuse, do not refactor
 
@@ -600,6 +644,16 @@ board and a battery that must not collide.
 - [x] Translucent x-ray ghosts, red on overlap, Settings -> Show Clearance.
 - [x] 18 acceptance checks against hand-computed envelopes and overlap cases.
 - [ ] Interference reported as text warnings, not only as colour.
+
+### Phase 1.6 -- objects become reusable files (done 2026-09-02)
+
+- [x] `src/board/surfaces.ts` -- a basis for all six surfaces (section 4.6).
+- [x] `*.object.txt` format with `[object]` and `[cutouts]` (section 4.5).
+- [x] Object faces resolved to box surfaces by direction, never named in the file.
+- [x] Object library with import / refresh / remove, mirroring boards.
+- [x] Object cutouts compiled into the model; bodies stay advisory.
+- [x] 17 acceptance checks, including the same pot file cutting a wall from one placement
+      and the lid from another.
 
 ### Phase 2 -- validation and preview
 

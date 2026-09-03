@@ -18,8 +18,9 @@ export function useEnvelopes(): Envelope[] {
   const boards = useDesign((s) => s.boards);
   const library = useDesign((s) => s.boardLibrary);
   const objects = useDesign((s) => s.objects);
+  const objectLibrary = useDesign((s) => s.objectLibrary);
   return useMemo(
-    () => collectEnvelopes(boards, library, objects, box, lid),
-    [boards, library, objects, box, lid]
+    () => collectEnvelopes(boards, library, objects, objectLibrary, box, lid),
+    [boards, library, objects, objectLibrary, box, lid]
   );
 }

@@ -1,8 +1,9 @@
 'use client';
 
-import type { BoxObjectParams, BoardDefinition, BoardPlacement } from './types';
+import type { BoardDefinition, BoardPlacement, ObjectDefinition, ObjectPlacement } from './types';
 import type { BoxParams, LidParams } from '@/store/useDesign';
 import { boardToSurface, boardZToWorldZ, surfaceToWorldXY } from './compile';
+import { objectCorners } from './compileObject';
 
 /**
  * The space something occupies inside the box, as a world-space axis-aligned
@@ -22,11 +23,6 @@ export interface Envelope {
   frame: 'box' | 'lid';
   min: [number, number, number];
   max: [number, number, number];
-}
-
-/** World Z of the lid's plate underside: it rests on the box rim. */
-function lidUndersideZ(box: BoxParams): number {
-  return box.height;
 }
 
 /** Lid-local Z is offset from assembled world Z by where the shoulder starts. */
@@ -75,70 +71,31 @@ export function boardEnvelope(
 }
 
 /**
- * The volume a free-standing object occupies.
+ * The volume a placed object occupies.
  *
- * Each surface uses its OWN user frame -- the same mapping its cutouts use in
- * geometry/cutouts.ts:99-176 -- and the object grows from that surface's
- * INTERIOR face inward, starting `offset` away from it.
+ * The corner maths lives in compileObject.ts, which already has to map object
+ * coordinates into the world to place the object's holes; this just wraps it
+ * with a frame and a label.
  */
-export function objectEnvelope(o: BoxObjectParams, box: BoxParams, lid: LidParams): Envelope {
-  const hx = o.sizeX / 2;
-  const hy = o.sizeY / 2;
-  const near = o.offset;
-  const far = o.offset + o.depth;
-
-  let min: [number, number, number];
-  let max: [number, number, number];
-  let frame: 'box' | 'lid' = 'box';
-
-  switch (o.surface) {
-    case 'floor': {
-      const c = surfaceToWorldXY('floor', o.x, o.y, box, lid);
-      min = [c.x - hx, c.y - hy, box.floorThickness + near];
-      max = [c.x + hx, c.y + hy, box.floorThickness + far];
-      break;
-    }
-    case 'lid': {
-      const c = surfaceToWorldXY('lid', o.x, o.y, box, lid);
-      const under = lidUndersideZ(box);
-      min = [c.x - hx, c.y - hy, toLidFrame(box, lid, under - far)];
-      max = [c.x + hx, c.y + hy, toLidFrame(box, lid, under - near)];
-      frame = 'lid';
-      break;
-    }
-    // Walls: user X runs along the wall as seen from INSIDE, user Y is height
-    // above the INTERIOR floor. Depth runs inward, away from the wall.
-    case 'front': {
-      const wx = box.length / 2 - box.wallThickness - o.x;
-      const face = -box.width / 2 + box.wallThickness;
-      min = [wx - hx, face + near, box.floorThickness + o.y - hy];
-      max = [wx + hx, face + far, box.floorThickness + o.y + hy];
-      break;
-    }
-    case 'back': {
-      const wx = -box.length / 2 + box.wallThickness + o.x;
-      const face = box.width / 2 - box.wallThickness;
-      min = [wx - hx, face - far, box.floorThickness + o.y - hy];
-      max = [wx + hx, face - near, box.floorThickness + o.y + hy];
-      break;
-    }
-    case 'left': {
-      const wy = -box.width / 2 + box.wallThickness + o.x;
-      const face = -box.length / 2 + box.wallThickness;
-      min = [face + near, wy - hx, box.floorThickness + o.y - hy];
-      max = [face + far, wy + hx, box.floorThickness + o.y + hy];
-      break;
-    }
-    default: {
-      const wy = box.width / 2 - box.wallThickness - o.x;
-      const face = box.length / 2 - box.wallThickness;
-      min = [face - far, wy - hx, box.floorThickness + o.y - hy];
-      max = [face - near, wy + hx, box.floorThickness + o.y + hy];
-      break;
-    }
-  }
-
-  return { kind: 'object', label: o.name, line: o.line, frame, min, max };
+export function objectEnvelope(
+  placement: ObjectPlacement,
+  obj: ObjectDefinition,
+  box: BoxParams,
+  lid: LidParams
+): Envelope | null {
+  const corners = objectCorners(placement, obj, box, lid);
+  if (!corners) return null;
+  const frame: 'box' | 'lid' = placement.surface === 'lid' ? 'lid' : 'box';
+  const fz = (z: number) => (frame === 'lid' ? toLidFrame(box, lid, z) : z);
+  const [z0, z1] = span(fz(corners.min[2]), fz(corners.max[2]));
+  return {
+    kind: 'object',
+    label: placement.objectName,
+    line: placement.line,
+    frame,
+    min: [corners.min[0], corners.min[1], z0],
+    max: [corners.max[0], corners.max[1], z1],
+  };
 }
 
 /** Do two envelopes overlap? Touching faces do not count. */
@@ -165,19 +122,27 @@ export function toWorld(e: Envelope, box: BoxParams, lid: LidParams): Envelope {
 /** Every occupant of the box, boards and objects alike. */
 export function collectEnvelopes(
   boards: BoardPlacement[],
-  library: BoardDefinition[],
-  objects: BoxObjectParams[],
+  boardLibrary: BoardDefinition[],
+  objects: ObjectPlacement[],
+  objectLibrary: ObjectDefinition[],
   box: BoxParams,
   lid: LidParams
 ): Envelope[] {
-  const byName = new Map(library.map((b) => [b.name.trim().toLowerCase(), b]));
+  const key = (n: string) => n.trim().toLowerCase();
+  const boardsByName = new Map(boardLibrary.map((b) => [key(b.name), b]));
+  const objectsByName = new Map(objectLibrary.map((o) => [key(o.name), o]));
   const out: Envelope[] = [];
+  // A placement naming something that is not loaded is reported by the
+  // compilers; there is simply nothing to draw for it here.
   for (const p of boards) {
-    const board = byName.get(p.boardName.trim().toLowerCase());
-    // A placement naming a board that is not loaded is reported by
-    // compileBoards; there is simply nothing to draw for it here.
+    const board = boardsByName.get(key(p.boardName));
     if (board) out.push(boardEnvelope(p, board, box, lid));
   }
-  for (const o of objects) out.push(objectEnvelope(o, box, lid));
+  for (const p of objects) {
+    const obj = objectsByName.get(key(p.objectName));
+    if (!obj) continue;
+    const env = objectEnvelope(p, obj, box, lid);
+    if (env) out.push(env);
+  }
   return out;
 }
