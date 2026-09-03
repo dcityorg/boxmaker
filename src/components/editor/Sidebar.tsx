@@ -36,6 +36,13 @@ import {
 import * as opentype from 'opentype.js';
 import { idbSaveCustomFont, idbClearCustomFont } from '@/store/fontCache';
 import { manifoldToBinarySTL, downloadBinary } from '@/geometry/exportSTL';
+import {
+  getDesignHandle,
+  pickSaveTarget,
+  rememberDesignHandle,
+  supportsSavePicker,
+  writeToHandle,
+} from '@/board/fileHandles';
 import { buildZip } from '@/geometry/zip';
 import { build3MF } from '@/geometry/export3MF';
 
@@ -50,6 +57,7 @@ interface SidebarProps {
 
 export function Sidebar({ helpOpen, onToggleHelp, undo, redo, canUndo, canRedo }: SidebarProps) {
   const designName = useDesign((s) => s.designName);
+  const [savedTo, setSavedTo] = useState<string | null>(null);
   const setDesignName = useDesign((s) => s.setDesignName);
   const isDirty = useDesign((s) => s.isDirty);
 
@@ -81,14 +89,40 @@ export function Sidebar({ helpOpen, onToggleHelp, undo, redo, canUndo, canRedo }
     details.forEach((d) => (d.open = !allOpen));
   }, []);
 
-  const handleSaveDesign = useCallback(() => {
+  /**
+   * Save the design.
+   *
+   * The plain download pipeline CANNOT overwrite: Chrome and Brave uniquify a
+   * colliding filename to "... (1)" and offer no way to replace. So when the
+   * browser supports the File System Access API we keep a handle to the file
+   * and write straight back to it -- a real Save, no dialog after the first
+   * time. Where it is not supported the old download is still there, and
+   * `saveAs` forces the picker either way.
+   */
+  const handleSaveDesign = useCallback(async (saveAs = false) => {
     try {
       const s = useDesign.getState();
-      const file = designFileFromState(s, getActiveCustomFont());
-      const json = JSON.stringify(file, null, 2);
-      const enc = new TextEncoder();
+      const json = JSON.stringify(designFileFromState(s, getActiveCustomFont()), null, 2);
       const baseName = (s.designName || 'boxmaker').replace(/[^a-z0-9-_]+/gi, '-');
-      downloadBinary(enc.encode(json).buffer as ArrayBuffer, `${baseName}.boxmaker.json`);
+      const fileName = `${baseName}.boxmaker.json`;
+
+      if (supportsSavePicker()) {
+        const existing = saveAs ? null : getDesignHandle();
+        const target = existing ?? (await pickSaveTarget(fileName));
+        if (target === null) return;           // user cancelled
+        if (target !== 'unsupported') {
+          if (await writeToHandle(target, json)) {
+            rememberDesignHandle(target);
+            setSavedTo(target.name);
+            useDesign.getState().markClean();
+            return;
+          }
+          // Permission declined -- fall through to the download.
+        }
+      }
+
+      const enc = new TextEncoder();
+      downloadBinary(enc.encode(json).buffer as ArrayBuffer, fileName);
       useDesign.getState().markClean();
     } catch (err) {
       console.error('[BoxMaker] save design failed:', err);
@@ -122,6 +156,8 @@ export function Sidebar({ helpOpen, onToggleHelp, undo, redo, canUndo, canRedo }
   }, []);
 
   const handleNewDesign = useCallback(() => {
+    rememberDesignHandle(null);
+    setSavedTo(null);
     runWithDirtyGuard(() => {
       clearCustomFonts();
       void idbClearCustomFont();
@@ -418,10 +454,14 @@ export function Sidebar({ helpOpen, onToggleHelp, undo, redo, canUndo, canRedo }
               Load
             </button>
             <button
-              onClick={handleSaveDesign}
+              onClick={() => handleSaveDesign(false)}
               className="flex-1 px-2 py-1 text-xs bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded hover:bg-[var(--border-color)] transition-colors"
               style={{ color: UI_MUTED }}
-              title="Download current design as JSON (custom font, if loaded, is embedded)"
+              title={
+                savedTo
+                  ? `Save straight back over ${savedTo}, no dialog. Use Save As to write a different file.`
+                  : 'Save the design as JSON. Where the browser allows it, the file is remembered so later saves overwrite it instead of piling up copies. A custom font, if loaded, is embedded.'
+              }
             >
               Save
             </button>
@@ -433,6 +473,20 @@ export function Sidebar({ helpOpen, onToggleHelp, undo, redo, canUndo, canRedo }
               className="hidden"
             />
           </div>
+          {savedTo && (
+            <div className="flex items-center gap-2 text-[10px] text-[var(--text-secondary)]">
+              <span className="flex-1 truncate" title={`Save writes straight back to ${savedTo}`}>
+                Saving to {savedTo}
+              </span>
+              <button
+                onClick={() => handleSaveDesign(true)}
+                className="shrink-0 underline hover:text-[var(--text-primary)]"
+                title="Write to a different file, and save there from now on"
+              >
+                Save As...
+              </button>
+            </div>
+          )}
           <button
             onClick={handleShareLink}
             className="w-full px-2 py-1 text-xs bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded hover:bg-[var(--border-color)] transition-colors"

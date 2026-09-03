@@ -11,7 +11,7 @@ import {
   forgetHandle,
   getHandle,
   hasHandle,
-  pickBoardFile,
+  pickFile,
   rememberHandle,
   rereadBoardFile,
   supportsFilePicker,
@@ -73,7 +73,7 @@ export function ObjectsControls() {
       return;
     }
     try {
-      const picked = await pickBoardFile();
+      const picked = await pickFile();
       if (picked && picked !== 'unsupported') await ingest(picked.file, picked.handle);
     } catch (err) {
       console.error('[BoxMaker] object import failed:', err);
@@ -104,7 +104,7 @@ export function ObjectsControls() {
         await ingest(file, getHandle(K(name)), name);
         return;
       }
-      const picked = await pickBoardFile();
+      const picked = await pickFile();
       if (picked && picked !== 'unsupported') await ingest(picked.file, picked.handle, name);
     } catch (err) {
       console.error('[BoxMaker] object refresh failed:', err);

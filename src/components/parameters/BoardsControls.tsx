@@ -11,7 +11,7 @@ import {
   forgetHandle,
   getHandle,
   hasHandle,
-  pickBoardFile,
+  pickFile,
   rememberHandle,
   rereadBoardFile,
   supportsFilePicker,
@@ -88,7 +88,7 @@ export function BoardsControls() {
       return;
     }
     try {
-      const picked = await pickBoardFile();
+      const picked = await pickFile();
       if (picked && picked !== 'unsupported') await ingest(picked.file, picked.handle);
     } catch (err) {
       console.error('[BoxMaker] board import failed:', err);
@@ -123,7 +123,7 @@ export function BoardsControls() {
         return;
       }
       // No handle (page was reloaded), or the file moved: ask for it again.
-      const picked = await pickBoardFile();
+      const picked = await pickFile();
       if (picked && picked !== 'unsupported') await ingest(picked.file, picked.handle, name);
     } catch (err) {
       console.error('[BoxMaker] board refresh failed:', err);

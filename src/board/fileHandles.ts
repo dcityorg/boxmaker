@@ -28,6 +28,18 @@ interface PickerWindow {
     multiple?: boolean;
     types?: Array<{ description: string; accept: Record<string, string[]> }>;
   }) => Promise<BoardFileHandle[]>;
+  showSaveFilePicker?: (options?: {
+    suggestedName?: string;
+    types?: Array<{ description: string; accept: Record<string, string[]> }>;
+  }) => Promise<WritableFileHandle>;
+}
+
+/** A handle we can write back to, from showSaveFilePicker or an opened file. */
+export interface WritableFileHandle extends BoardFileHandle {
+  createWritable(): Promise<{
+    write(data: string | BufferSource | Blob): Promise<void>;
+    close(): Promise<void>;
+  }>;
 }
 
 const handles = new Map<string, BoardFileHandle>();
@@ -82,7 +94,7 @@ export function supportsFilePicker(): boolean {
  *
  * Returns null when the user cancels.
  */
-export async function pickBoardFile(): Promise<
+export async function pickFile(): Promise<
   { file: File; handle: BoardFileHandle } | null | 'unsupported'
 > {
   const show = picker();
@@ -120,4 +132,76 @@ export async function rereadBoardFile(boardName: string): Promise<File | null> {
     console.warn('[BoxMaker] could not re-read board file:', err);
     return null;
   }
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Saving in place                                                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * True when the browser can write a file back where it came from.
+ *
+ * Without it, "Save" goes through the DOWNLOAD pipeline, which refuses to
+ * overwrite: Chrome and Brave uniquify the name to "... (1)" and there is no way
+ * to make a download replace a file. Feature-detect the method, never the
+ * interface -- see the note on supportsFilePicker.
+ */
+export function supportsSavePicker(): boolean {
+  if (typeof window === 'undefined') return false;
+  return typeof (window as unknown as PickerWindow).showSaveFilePicker === 'function';
+}
+
+/** Ask where to save. Returns null if the user cancels. */
+export async function pickSaveTarget(
+  suggestedName: string
+): Promise<WritableFileHandle | null | 'unsupported'> {
+  const show = (window as unknown as PickerWindow).showSaveFilePicker;
+  if (!show) return 'unsupported';
+  try {
+    return await show({
+      suggestedName,
+      types: [{ description: 'BoxMaker design', accept: { 'application/json': ['.json'] } }],
+    });
+  } catch (err) {
+    if ((err as DOMException)?.name === 'AbortError') return null;
+    throw err;
+  }
+}
+
+/**
+ * Write text to a handle, asking for write permission if it is not already
+ * granted (a handle from showOpenFilePicker starts read-only). Returns false if
+ * the user declines, so the caller can fall back rather than fail silently.
+ */
+export async function writeToHandle(h: WritableFileHandle, text: string): Promise<boolean> {
+  const q = h as unknown as {
+    queryPermission?(d: { mode: string }): Promise<PermissionState>;
+    requestPermission?(d: { mode: string }): Promise<PermissionState>;
+  };
+  if (q.queryPermission) {
+    let state = await q.queryPermission({ mode: 'readwrite' });
+    if (state === 'prompt' && q.requestPermission) {
+      state = await q.requestPermission({ mode: 'readwrite' });
+    }
+    if (state !== 'granted') return false;
+  }
+  const w = await h.createWritable();
+  await w.write(text);
+  await w.close();
+  return true;
+}
+
+/**
+ * The file the current design was last saved to or opened from, for this page
+ * only. Session-scoped on purpose: a handle is not serialisable and means
+ * nothing on another machine, so it must stay out of the design file, the share
+ * link, autosave and undo.
+ */
+let designHandle: WritableFileHandle | null = null;
+
+export function rememberDesignHandle(h: WritableFileHandle | null): void {
+  designHandle = h;
+}
+export function getDesignHandle(): WritableFileHandle | null {
+  return designHandle;
 }
