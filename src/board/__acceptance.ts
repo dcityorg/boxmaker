@@ -11,7 +11,7 @@
  * docs/examples/air-quality-monitor.boxmaker.json.
  */
 import type { BoxParams, LidParams } from '@/store/useDesign';
-import { parseBoardFile } from './parseBoard';
+import { parseBoardFile, normalizeBoardDefinition } from './parseBoard';
 import { parseBoardsText } from './parsePlacements';
 import { compileBoard, convertFrame, isMirrored, targetSurface, boardToSurface, wallFacedBy, boardZToWorldZ } from './compile';
 import type { BoardEdge, BoardPlacement, ObjectPlacement } from './types';
@@ -401,6 +401,23 @@ check('lid board draws in the lid frame', le.frame === 'lid');
 // world 69.8 .. 76.8, less the lid frame shift of (76 - 4) = 72
 check('lid board Z is converted to lid-local', near3([le.min[2], le.max[2]], [-2.2, 4.8]),
   `${le.min[2]}..${le.max[2]}`);
+
+console.log('\n[17b] a board stored before Height existed must not produce NaN');
+// boardLibrary is persisted BY VALUE, so a design saved before phase 1.5 holds
+// board definitions with no height / heightBelow at all. Reading them back
+// undefined and negating one is where the viewport's NaN came from.
+const legacy = JSON.parse(JSON.stringify(tall.board!)) as Record<string, unknown>;
+delete legacy.height;
+delete legacy.heightBelow;
+const le2 = boardEnvelope(
+  { ...mk('floor', 'up'), x: 10, y: 20, standoffHeight: 6 },
+  normalizeBoardDefinition(legacy as never), BOX, LID
+);
+check('every coordinate is finite',
+  [...le2.min, ...le2.max].every((v) => Number.isFinite(v)),
+  JSON.stringify([le2.min, le2.max]));
+check('missing Height falls back to the bare board thickness',
+  near(le2.max[2] - le2.min[2], 1.6, 1e-9), `${le2.max[2] - le2.min[2]}`);
 
 console.log('\n[18] interference detection');
 const boardAt = (x: number, y: number) =>

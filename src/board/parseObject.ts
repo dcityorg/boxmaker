@@ -155,3 +155,16 @@ function parseFace(token: string | undefined): ObjectFace | null {
   if (v === 'base' || v === 'top' || v === 'x+' || v === 'x-' || v === 'y+' || v === 'y-') return v;
   return null;
 }
+
+/** Same insurance as normalizeBoardDefinition, for stored object definitions. */
+export function normalizeObjectDefinition(o: ObjectDefinition): ObjectDefinition {
+  const num = (v: unknown, fallback: number) =>
+    typeof v === 'number' && Number.isFinite(v) ? v : fallback;
+  return {
+    ...o,
+    sizeX: num(o.sizeX, 1),
+    sizeY: num(o.sizeY, 1),
+    sizeZ: num(o.sizeZ, 1),
+    cutouts: o.cutouts ?? [],
+  };
+}

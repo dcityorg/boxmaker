@@ -310,3 +310,32 @@ function parseSide(token: string | undefined): BoardFeatureSide | null {
   if (v === 'top' || v === 'bottom') return v;
   return null;
 }
+
+/**
+ * Fill in fields a stored board definition may predate.
+ *
+ * The library is persisted BY VALUE inside the design, so a design saved before
+ * a field existed holds entries without it. `heightBelow` was the one that bit:
+ * undefined negated is NaN, which flowed into an envelope and then into a
+ * three.js BoxGeometry, filling the console with "Computed radius is NaN".
+ *
+ * Cheap insurance, and the right place for it -- one function on the way in,
+ * rather than a `?? 0` at every point of use.
+ */
+export function normalizeBoardDefinition(b: BoardDefinition): BoardDefinition {
+  return {
+    ...b,
+    thickness: num(b.thickness, 1.6),
+    cornerRadius: num(b.cornerRadius, 0),
+    height: num(b.height, 0),
+    heightBelow: num(b.heightBelow, 0),
+    mounts: b.mounts ?? [],
+    cutouts: b.cutouts ?? [],
+    edges: b.edges ?? [],
+    keepouts: b.keepouts ?? [],
+  };
+}
+
+function num(v: unknown, fallback: number): number {
+  return typeof v === 'number' && Number.isFinite(v) ? v : fallback;
+}

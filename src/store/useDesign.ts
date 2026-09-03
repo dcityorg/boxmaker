@@ -493,6 +493,8 @@ export function parseStandoffsText(text: string): {
 }
 
 import { parseBoardsText } from '@/board/parsePlacements';
+import { normalizeBoardDefinition } from '@/board/parseBoard';
+import { normalizeObjectDefinition } from '@/board/parseObject';
 import { parseObjectPlacementsText } from '@/board/parseObjectPlacements';
 import type {
   BoardDefinition,
@@ -763,11 +765,13 @@ export const useDesign = create<DesignState>((set) => ({
       boardsText: design.boardsText ?? DEFAULT_BOARDS_TEXT,
       boards: boardsParse.placements,
       boardErrors: boardsParse.errors,
-      boardLibrary: design.boardLibrary ?? [],
+      // Stored by value, so entries can predate fields -- see
+      // normalizeBoardDefinition.
+      boardLibrary: (design.boardLibrary ?? []).map(normalizeBoardDefinition),
       objectsText: design.objectsText ?? DEFAULT_OBJECTS_TEXT,
       objects: objectsParse.placements,
       objectErrors: objectsParse.errors,
-      objectLibrary: design.objectLibrary ?? [],
+      objectLibrary: (design.objectLibrary ?? []).map(normalizeObjectDefinition),
       isDirty: false,
     });
   },

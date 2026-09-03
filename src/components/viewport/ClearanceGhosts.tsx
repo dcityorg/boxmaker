@@ -76,12 +76,22 @@ export function ClearanceGhosts() {
   const show = useDesign((s) => s.appearance.showClearance);
   const envelopes = useEnvelopes();
 
-  if (!show || envelopes.length === 0) return null;
+  if (!show) return null;
+
+  // Belt and braces: a single non-finite coordinate reaching a BoxGeometry
+  // makes three.js compute a NaN bounding sphere and spam the console, and the
+  // cause is never obvious from the message. Drop such an envelope rather than
+  // hand it over. Nothing should produce one -- normalizeBoardDefinition covers
+  // the case that did -- so this is a net, not a fix.
+  const finite = envelopes.filter((e) =>
+    [...e.min, ...e.max].every((v) => Number.isFinite(v))
+  );
+  if (finite.length === 0) return null;
 
   // Compare in assembled coordinates: a lid-mounted board and a floor object
   // can certainly collide, and each is stored in its own frame.
   const dz = box.height - lid.coverShoulderDepth;
-  const world = envelopes.map((e) =>
+  const world = finite.map((e) =>
     e.frame === 'lid'
       ? { ...e, min: [e.min[0], e.min[1], e.min[2] + dz], max: [e.max[0], e.max[1], e.max[2] + dz] }
       : e
@@ -93,7 +103,7 @@ export function ClearanceGhosts() {
 
   return (
     <group>
-      {envelopes.map((e, i) =>
+      {finite.map((e, i) =>
         (e.frame === 'lid' ? view === 'box' : view === 'lid') ? null : (
           <EnvelopeMesh key={i} env={e} lidZ={lidZ} clashing={clash[i]} />
         )
