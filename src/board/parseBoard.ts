@@ -20,7 +20,8 @@ import type {
  *   [board]      Name / Size / Thickness / CornerRadius / Height / HeightBelow
  *   [mounts]     X, Y, BoardHoleDia
  *   [cutouts]    Side, Shape, X, Y, <shape args>, Clearance
- *   [edges]      Edge, Pos, Z, SizeAlong, SizeZ, CornerRadius, Clearance
+ *   [edges]      Edge, Round, Pos, Z, Diameter, Clearance
+ *                Edge, Rect,  Pos, Z, Width, Height, CornerRadius, Clearance
  *   [keepouts]   X, Y, SizeX, SizeY, Height, Side          (optional)
  *
  * `//` starts a comment anywhere on a line, including after data, and runs to
@@ -204,22 +205,52 @@ export function parseBoardFile(text: string): {
 
       case 'edges': {
         const edge = parseEdge(tokens[0]);
-        const nums = numbers(tokens.slice(1));
-        if (tokens.length !== 7 || nums === null || edge === null) {
+        if (edge === null) {
           errors.push({
             line: lineNo,
-            reason:
-              `expected 7 fields (Edge,Pos,Z,SizeAlong,SizeZ,CornerRadius,Clearance) ` +
-              `with Edge one of x+ x- y+ y-, got ${tokens.length} fields`,
+            reason: `Edge must be one of x+ x- y+ y-, got "${tokens[0]}"`,
           });
           break;
         }
-        const [pos, z, sizeAlong, sizeZ, cornerRadius, clearance] = nums;
-        if (sizeAlong <= 0 || sizeZ <= 0) {
-          errors.push({ line: lineNo, reason: 'SizeAlong and SizeZ must be positive' });
-          break;
+        const shape = (tokens[1] ?? '').toLowerCase();
+        if (shape === 'round') {
+          const nums = numbers(tokens.slice(2));
+          if (tokens.length !== 6 || nums === null) {
+            errors.push({
+              line: lineNo,
+              reason: `Round expects 6 fields (Edge,Round,Pos,Z,Diameter,Clearance), got ${tokens.length}`,
+            });
+            break;
+          }
+          const [pos, z, diameter, clearance] = nums;
+          if (diameter <= 0) {
+            errors.push({ line: lineNo, reason: 'Diameter must be positive' });
+            break;
+          }
+          edges.push({ line: lineNo, edge, kind: 'round', pos, z, diameter, clearance });
+        } else if (shape === 'rect') {
+          const nums = numbers(tokens.slice(2));
+          if (tokens.length !== 8 || nums === null) {
+            errors.push({
+              line: lineNo,
+              reason:
+                `Rect expects 8 fields (Edge,Rect,Pos,Z,Width,Height,CornerRadius,Clearance), ` +
+                `got ${tokens.length}`,
+            });
+            break;
+          }
+          const [pos, z, width, height, cornerRadius, clearance] = nums;
+          if (width <= 0 || height <= 0) {
+            errors.push({ line: lineNo, reason: 'Width and Height must be positive' });
+            break;
+          }
+          edges.push({ line: lineNo, edge, kind: 'rect', pos, z, width, height, cornerRadius, clearance });
+        } else {
+          errors.push({
+            line: lineNo,
+            reason: `Shape must be "Round" or "Rect", got "${tokens[1] ?? ''}"`,
+          });
         }
-        edges.push({ line: lineNo, edge, pos, z, sizeAlong, sizeZ, cornerRadius, clearance });
         break;
       }
     }

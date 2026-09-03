@@ -121,20 +121,31 @@ export function compileBoard(
     const point = edgePoint(board, e.edge, e.pos);
     const local = boardToSurface(placement, point[0], point[1]);
     const world = surfaceToWorldXY(placement.surface, local.x, local.y, box, lid);
+    const x = wallAlongCoordinate(wall, world.x, world.y, box);
+    // Wall frames measure Y up from the INTERIOR floor, not from z = 0.
+    const y = boardZToWorldZ(placement, board, e.z, box) - box.floorThickness;
 
-    const width = e.sizeAlong + 2 * e.clearance;
-    const height = e.sizeZ + 2 * e.clearance;
+    if (e.kind === 'round') {
+      const diameter = e.diameter + 2 * e.clearance;
+      if (diameter <= 0) {
+        errors.push(`board "${board.name}": ${e.edge} connector has non-positive size`);
+        continue;
+      }
+      cutouts.push({ surface: wall, kind: 'round', x, y, diameter });
+      continue;
+    }
+
+    const width = e.width + 2 * e.clearance;
+    const height = e.height + 2 * e.clearance;
     if (width <= 0 || height <= 0) {
       errors.push(`board "${board.name}": ${e.edge} connector has non-positive size`);
       continue;
     }
-
     cutouts.push({
       surface: wall,
       kind: 'rect',
-      x: wallAlongCoordinate(wall, world.x, world.y, box),
-      // Wall frames measure Y up from the INTERIOR floor, not from z = 0.
-      y: boardZToWorldZ(placement, board, e.z, box) - box.floorThickness,
+      x,
+      y,
       width,
       height,
       // Size only -- see the note on component cutouts above.

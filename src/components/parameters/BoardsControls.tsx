@@ -181,13 +181,25 @@ export function BoardsControls() {
             <div>X,Y = center of the opening (mm)</div>
           </div>
           <div className="mb-1">
-            <code className="not-italic">[edges]</code> — connector holes through a side wall
-            <div><code className="not-italic">Edge,​Pos,​Z,​SizeAlong,​SizeZ,​CornerRadius,​Clearance</code></div>
+            <code className="not-italic">[edges]</code> — connector holes through a SIDE WALL
+            <div><code className="not-italic">Edge,​Round,​Pos,​Z,​Diameter,​Clearance</code></div>
+            <div><code className="not-italic">Edge,​Rect,​Pos,​Z,​Width,​Height,​CornerRadius,​Clearance</code></div>
             <div>
-              Edge: <code className="not-italic">x+ x- y+ y-</code> — which board edge, x+ being the one at maximum board X
+              Edge: <code className="not-italic">x+ x- y+ y-</code> — which board edge the connector sits
+              on. <code className="not-italic">x+</code> is the edge at maximum board X, so for a board
+              seen from the component side, <code className="not-italic">x-</code> is its left edge and{' '}
+              <code className="not-italic">y-</code> its bottom edge.
             </div>
-            <div>Pos = along that edge: board Y for x+/x-, board X for y+/y-</div>
-            <div>Z = center height above the NON-component face, so add the board thickness (a jack 1.5 above a 1.6 board is 3.1)</div>
+            <div>Pos = position along that edge: board Y for x+/x-, board X for y+/y-</div>
+            <div>
+              Z = centre height of the opening above the NON-component face, so add the board thickness
+              (a jack 1.5 above a 1.6 board is 3.1)
+            </div>
+            <div>Width = the opening ALONG the edge; Height = the opening vertically (mm)</div>
+            <div>
+              Which box wall gets cut is worked out from the surface, Components and Rotation — you never
+              name a wall.
+            </div>
           </div>
           <div className="mb-1">
             <code className="not-italic">[keepouts]</code> — optional, for tall parts

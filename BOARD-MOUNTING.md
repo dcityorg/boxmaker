@@ -211,8 +211,9 @@ HeightBelow, 2.0               // OPTIONAL: anything protruding below, e.g. lead
 top,    Rect,  25.4, 11.4, 30, 15, 1, 0.4
 bottom, Round, 10.0,  5.0, 3.5, 0.3
 
-[edges]                        // Edge, Pos, Z, SizeAlong, SizeZ, CornerRadius, Clearance
-x-, 15.0, 3.1, 9.0, 3.5, 0.5, 0.4
+[edges]                        // Edge, Shape, Pos, Z, <shape args>, Clearance
+x-, Rect,  15.0, 3.1, 9.0, 3.5, 0.5, 0.4
+y-, Round, 12.0, 4.0, 8.0, 0.4
 
 [keepouts]                     // OPTIONAL: X, Y, SizeX, SizeY, Height, Side
 25.4, 11.43, 50.8, 22.86, 8, top   // X,Y is the CENTRE, as in [cutouts]
@@ -267,23 +268,44 @@ sanity-check the standoff OD.
 ### 4.3 Connector cutouts -- the `[edges]` section
 
 ```
-Edge, Pos, Z, SizeAlong, SizeZ, CornerRadius, Clearance
+Edge, Round, Pos, Z, Diameter, Clearance
+Edge, Rect,  Pos, Z, Width, Height, CornerRadius, Clearance
 ```
 
+Shaped like `[cutouts]` on purpose: `Shape` in field 2, `Clearance` last, so the two
+sections read the same way. `Round` was added 2026-09-02 -- the section shipped rect-only,
+which made a circular connector hole impossible to express.
+
 - **`Edge`** -- `x+`, `x-`, `y+`, `y-`: which board edge the connector sits on, named in
-  board-local terms. `x+` is the edge at maximum board X. Which box wall that ends up
-  facing is resolved at placement time from the surface, the components direction and the
-  rotation.
+  board-local terms. `x+` is the edge at maximum board X, so on a board viewed from the
+  component side, `x-` is its left edge and `y-` its bottom edge. **Which box wall gets cut
+  is derived** from the mounting surface, `Components` and `Rotation` -- a wall is never
+  named in the board file, which is what keeps the file reusable.
 - **`Pos`** -- position along that edge, in board coordinates. Board **Y** for an `x+`/`x-`
-  edge, board **X** for a `y+`/`y-` edge.
+  edge, board **X** for a `y+`/`y-` edge. Only one axis is free: the other is the edge.
 - **`Z`** -- the opening's centre height above the board's **non-component face**, i.e.
   above board `Z = 0` (section 3.1). For a connector on the component side that is the
   board thickness plus the datasheet's height above the board surface: a USB-C jack whose
   centre sits 1.5 mm above a 1.6 mm board is `Z = 3.1`. Measuring from `Z = 0` keeps the
   number board-intrinsic, so it survives the board being mounted upside down.
-- **`SizeAlong` / `SizeZ`** -- the opening, along the edge and vertically.
+- **`Width` / `Height`** -- rect only. `Width` is the opening **along the edge**, `Height`
+  is vertical. These were called `SizeAlong` and `SizeZ` until 2026-09-02; the old names
+  were jargon and were never defined in the sidebar legend at all.
 - **`CornerRadius` / `Clearance`** -- as in `[cutouts]`: clearance grows the opening on
   every side and leaves the corner radius alone.
+
+**Worked example.** A board 20 x 10 x 1 sitting on 6 mm standoffs on the floor, with a
+10 mm round connector hole centred on its left edge, 5 mm up from the underside:
+
+```
+[edges]
+x-, Round, 5, 5, 10, 0.5
+```
+
+`x-` because the left edge is at minimum board X. `Pos 5` centres it on the 10 mm edge.
+`Z 5` is measured from the non-component face. With the board origin at floor user
+(20, 30), that compiles to a round cutout in the **left wall** at along-wall 35, height 11
+above the interior floor, diameter 11 -- checked in `__acceptance.ts` [13b].
 
 The compiler resolves the wall, projects the edge point to world coordinates and inverts
 the per-wall frames in `cutouts.ts:123-175` to get the along-wall coordinate. Height comes

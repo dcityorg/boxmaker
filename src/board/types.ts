@@ -71,25 +71,30 @@ export type BoardEdge = 'x+' | 'x-' | 'y+' | 'y-';
 /**
  * A connector cutout through a side wall: USB, barrel jack, header.
  *
+ * Shaped like a [cutouts] entry, so the two sections read the same way:
+ *   Edge, Round, Pos, Z, Diameter, Clearance
+ *   Edge, Rect,  Pos, Z, Width, Height, CornerRadius, Clearance
+ *
  *   pos   -- along the named edge, in board coordinates. Board Y for an x+/x-
  *            edge, board X for a y+/y- edge.
- *   z     -- the cutout centre's height above the board's NON-COMPONENT face,
+ *   z     -- the opening's centre height above the board's NON-COMPONENT face,
  *            i.e. above board Z = 0 (section 3.1). For a connector on the
- *            component side, that is the board thickness plus whatever the
+ *            component side that is the board thickness plus whatever the
  *            datasheet gives above the board surface: a USB-C jack whose centre
  *            is 1.5 mm above a 1.6 mm board is z = 3.1.
- *   sizeAlong / sizeZ -- opening size along the edge and vertically.
+ *   width  -- rect only: the opening ALONG the edge.
+ *   height -- rect only: the opening vertically.
  */
-export interface BoardEdgeCutout {
+export type BoardEdgeCutout = {
   line?: number;
   edge: BoardEdge;
   pos: number;
   z: number;
-  sizeAlong: number;
-  sizeZ: number;
-  cornerRadius: number;
   clearance: number;
-}
+} & (
+  | { kind: 'round'; diameter: number }
+  | { kind: 'rect'; width: number; height: number; cornerRadius: number }
+);
 
 /**
  * A "nothing else here" volume: a tall component, a connector, a header.

@@ -158,16 +158,16 @@ Thickness, 1.6
 [mounts]
 2.5, 2.5, 2.2
 
-[edges]      // Edge, Pos, Z, SizeAlong, SizeZ, CornerRadius, Clearance
-y-, 25, 3.1, 9, 3.5, 0.5, 0.4
+[edges]      // Edge, Shape, Pos, Z, ...
+y-, Rect, 25, 3.1, 9, 3.5, 0.5, 0.4
 `;
 const rig = parseBoardFile(CONNECTOR_BOARD);
 
 console.log('\n[10] the [edges] section parses');
 check('no errors', rig.errors.length === 0, JSON.stringify(rig.errors));
 check('one edge cutout on y-', rig.board!.edges.length === 1 && rig.board!.edges[0].edge === 'y-');
-const badEdge = parseBoardFile('[board]\nName, x\nSize, 1, 1\n[mounts]\n0,0,1\n[edges]\nz+, 1,1,1,1,0,0\n');
-check('rejects an unknown edge name', badEdge.errors.some((e) => /Edge one of/.test(e.reason)));
+const badEdge = parseBoardFile('[board]\nName, x\nSize, 1, 1\n[mounts]\n0,0,1\n[edges]\nz+, Rect, 1,1,1,1,0,0\n');
+check('rejects an unknown edge name', badEdge.errors.some((e) => /Edge must be one of/.test(e.reason)));
 
 console.log('\n[11] ACCEPTANCE: connector through a wall, hand-computed');
 // floor, components up, rotation 0, board 0,0 at floor user (10,20), standoffs 6 high.
@@ -217,7 +217,7 @@ console.log('\n[13] ACCEPTANCE: connector on a lid-mounted board');
 // z: plate underside sits on the rim at 76; standoffs hang 2.6, so the board's
 //   UPPER (component) face is at 73.4. Board Z 3.1 is 1.5 above that: 74.9,
 //   less floorThickness = 72.4
-const lidRig = parseBoardFile(CONNECTOR_BOARD.replace('y-, 25,', 'x-, 15,').replace('Size, 50, 30', 'Size, 96.6, 30.1'));
+const lidRig = parseBoardFile(CONNECTOR_BOARD.replace('y-, Rect, 25,', 'x-, Rect, 15,').replace('Size, 50, 30', 'Size, 96.6, 30.1'));
 const lidOut = compileBoard(
   { ...placements[0], standoffHeight: 2.6 }, lidRig.board!, BOX, LID
 );
@@ -225,6 +225,35 @@ const lidConn = lidOut.cutouts.find((c) => c.surface === 'left');
 check('cuts the LEFT wall', !!lidConn);
 check('along the wall at 53.2', !!lidConn && near(lidConn.x, 53.2, 1e-9), `got ${lidConn?.x}`);
 check('72.4 above the interior floor', !!lidConn && near(lidConn.y, 72.4, 1e-9), `got ${lidConn?.y}`);
+
+console.log("\n[13b] ACCEPTANCE: Gary's round connector, worked end to end");
+// Board 20 x 10 x 1 on the floor, 6mm standoffs, origin at floor user (20,30).
+// A 10mm round hole centred on the board's LEFT edge (x-), 5mm up from the
+// non-component face, 0.5 clearance.
+//   x- faces the LEFT wall. Edge point (0,5) -> floor user (20,35)
+//   -> world (-40, -3.5) -> left-wall along = -3.5 + 41 - 2.5 = 35
+//   z: board underside sits at 2.5+6 = 8.5, +5 = 13.5, less the floor = 11
+//   diameter: 10 + 2*0.5 = 11
+const garyBoard = parseBoardFile(`[board]
+Name, Connector demo
+Size, 20, 10
+Thickness, 1
+[mounts]
+2, 2, 2.2
+[edges]
+x-, Round, 5, 5, 10, 0.5
+`);
+check('round edge parses', garyBoard.errors.length === 0, JSON.stringify(garyBoard.errors));
+const garyOut = compileBoard(
+  { ...mk('floor', 'up'), x: 20, y: 30, standoffHeight: 6 }, garyBoard.board!, BOX, LID
+);
+const hole = garyOut.cutouts[0];
+check('cuts the LEFT wall', hole.surface === 'left', `got ${hole.surface}`);
+check('is ROUND, not a rectangle', hole.kind === 'round', `got ${hole.kind}`);
+check('along the wall at 35', near(hole.x, 35, 1e-9), `got ${hole.x}`);
+check('11 above the interior floor', near(hole.y, 11, 1e-9), `got ${hole.y}`);
+check('diameter grown by clearance to 11',
+  hole.kind === 'round' && near((hole as { diameter: number }).diameter, 11, 1e-9));
 
 console.log('\n[14] which wall each edge faces');
 const wallOf = (surface: 'floor' | 'lid', components: 'up' | 'down', rot: number, edge: BoardEdge) =>
