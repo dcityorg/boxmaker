@@ -685,6 +685,12 @@ board does not fit.
 - **Standoff top variants** -- integral peg through the board hole instead of a screw, or
   a snap post.
 - **Board thumbnails** in the library picker, matching VaseMaker's preset thumbnails.
+- **Named saves inside the app.** Designs kept in browser storage and chosen from a list,
+  instead of a file dialog every time. No downloads, no `(1)` suffix, works in every
+  browser including ones that block the File System Access API (section 16). File save then
+  becomes what it should be -- export, backup and sharing -- rather than the day-to-day
+  iteration loop. Raised 2026-09-02 when the browser limitation below turned out to be
+  unfixable from inside the app.
 - **Multi-board stacking** -- a board mounted on standoffs rising from another board.
 
 ---
@@ -713,3 +719,41 @@ board does not fit.
 8. Reproduce the Air Quality Monitor's four board groups as four placed boards, and diff
    the exploded standoff lines against the hand-entered originals. That example is the
    real acceptance test.
+
+---
+
+## 16. Browser constraint: the File System Access API
+
+Recorded 2026-09-02 so this is not re-investigated from scratch.
+
+Two features degrade gracefully but noticeably depending on the browser:
+
+| Feature | With the API | Without it |
+|---|---|---|
+| **Save** | Writes straight back over the same file, no dialog after the first | Falls back to a download. A download can **never** overwrite: the browser uniquifies to `... (1)` and the original greys out. Replacing means deleting the ` (1)` by hand and confirming Replace. |
+| **Board / object refresh** | Re-reads the file silently | Opens a file picker every time |
+
+**Brave blocks the API by default** -- it is the one Chromium browser that does, and it
+applies in normal windows, not only private ones. Confirmed by Gary running
+`typeof window.showSaveFilePicker` in both: `undefined` each time. Brave has since added a
+feature flag, so `brave://flags` searching for "file system" is the first thing to try.
+Chrome supports it outright.
+
+Both features feature-detect **the method itself, never the interface**: a Chrome
+extension's isolated world exposes `FileSystemFileHandle` while `showOpenFilePicker` is
+absent, so an interface check would report support that is not there. Detection also runs
+**synchronously before any `await`**, so the fallback `input.click()` still happens inside
+the click's user activation.
+
+**There is no app-side fix.** A web page cannot write to a local file without this API. The
+alternative is to stop touching files during iteration at all -- see "named saves inside
+the app" in section 14.
+
+---
+
+## 17. Verified end to end
+
+2026-09-02, by Gary: a design with boards and objects saved to a file, reloaded, and
+everything restored -- which is the confirmation that the `designFileFromState` fix
+(commit `18dd2e4`) actually closed the data-loss hole where Save Design and Share Link were
+dropping `boardsText`, `boardLibrary`, `objectsText` and `objectLibrary`.
