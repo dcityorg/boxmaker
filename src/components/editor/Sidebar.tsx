@@ -460,7 +460,9 @@ export function Sidebar({ helpOpen, onToggleHelp, undo, redo, canUndo, canRedo }
               title={
                 savedTo
                   ? `Save straight back over ${savedTo}, no dialog. Use Save As to write a different file.`
-                  : 'Save the design as JSON. Where the browser allows it, the file is remembered so later saves overwrite it instead of piling up copies. A custom font, if loaded, is embedded.'
+                  : supportsSavePicker()
+                    ? 'Save the design as JSON. The file is remembered, so later saves overwrite it with no dialog. A custom font, if loaded, is embedded.'
+                    : 'Save the design as JSON. This browser cannot write a file in place -- it downloads instead, and a download can never overwrite, so saving over an existing file means deleting the " (1)" the browser adds and confirming Replace. (Private windows often disable this; a normal window may behave better.)'
               }
             >
               Save
