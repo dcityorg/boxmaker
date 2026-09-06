@@ -38,7 +38,8 @@ const HELP_SECTIONS: HelpSection[] = [
           'Adjust wall / floor thickness and corner radii',
           'Tune the lid plate and shoulder (the part that fits inside the box)',
           'Toggle snap-fit clips per side -- skip walls where another feature would interfere',
-          'Add standoffs, cutouts, and text labels via the three comma-delimited textareas',
+          'Place boards and objects from reusable definition files -- their standoffs and holes are generated for you',
+          'Add any remaining standoffs, cutouts, and text labels via the comma-delimited textareas',
           'Click `Export STL` (zip) or `Export 3MF` (single multi-material file)',
         ],
       },
@@ -51,6 +52,11 @@ const HELP_SECTIONS: HelpSection[] = [
         type: 'tip',
         text:
           'Use the View radio in Settings to show just the `box`, just the `lid`, or the `assembled` view.',
+      },
+      {
+        type: 'tip',
+        text:
+          'If a box holds anything more than a couple of standoffs, define your PC boards and parts as files and place them -- see Boards and Objects. You then measure each part once, ever, and BoxMaker keeps the standoffs, holes and clearances consistent for you.',
       },
     ],
   },
@@ -230,6 +236,277 @@ const HELP_SECTIONS: HelpSection[] = [
         type: 'tip',
         text:
           'Lid pops off too easily -> increase `Nub height` by 0.5 mm (you may also need to increase `Shoulder depth` if it is not tall enough). Lid won\'t close -> decrease `Nub height` by 0.5 mm.',
+      },
+    ],
+  },
+  {
+    id: 'boards',
+    title: 'Boards',
+    blocks: [
+      {
+        type: 'paragraph',
+        text:
+          'A PC board is described ONCE in its own reusable text file -- outline, mounting holes, and the holes its components need through the enclosure -- and then placed in a box. Its mounting holes become standoffs; its cutouts are cut through whichever surface they end up facing. Nothing about the box appears in the board file, so the same file works in every project.',
+      },
+      {
+        type: 'tip',
+        text:
+          'Two separate things: the board FILE (reusable, imported into the Boards panel) and the placement LINE (where it sits in THIS box). Edit the file and click the refresh icon beside its name to re-read it.',
+      },
+      { type: 'heading', text: 'Board coordinate frame' },
+      {
+        type: 'list',
+        items: [
+          '`0,0` is a corner you pick, VIEWED FROM THE COMPONENT SIDE. `+X` right, `+Y` up -- the way a mechanical drawing reads.',
+          '`Z = 0` is the board\'s NON-component face. `+Z` points toward the components.',
+          'Feature sides are named `top` and `bottom` relative to the BOARD, never `lid` or `floor`. A display is on the top of the board in every box; which box surface gets cut is worked out from the placement.',
+        ],
+      },
+      { type: 'heading', text: 'Board file' },
+      {
+        type: 'code',
+        text:
+`// Adafruit Feather with an ESP32 stacked on it
+[board]
+Name, feathstack1
+Size, 50.8, 22.86
+Thickness, 1.6
+Height, 23              // total above the NON-component face, stack included
+HeightBelow, 1.5        // leads etc. sticking out below
+
+[mounts]                 // X, Y, BoardHoleDia
+2.54,  2.54,  2.78
+48.26, 2.54,  2.78
+48.26, 20.32, 2.78
+2.54,  20.32, 2.78
+
+[cutouts]                // Side, Shape, X, Y, <args>, Clearance
+top, Rect, 25.4, 11.4, 30, 15, 1, 0.4
+
+[edges]                  // connector holes through a SIDE WALL
+x-, Rect, 11.43, 16, 18, 13, 2, 0`,
+      },
+      { type: 'heading', text: 'Sections' },
+      {
+        type: 'table',
+        headers: ['Section', 'Meaning'],
+        rows: [
+          ['`[board]`', '`Name` and `Size` required. `Thickness` (default 1.6), `CornerRadius` (default 0), `Height`, `HeightBelow`.'],
+          ['`Height`', 'Total height above the NON-component face, INCLUDING the board and anything stacked on it. Drives the clearance ghost. 0 or omitted = unmeasured, drawn as a bare PCB.'],
+          ['`HeightBelow`', 'How far anything protrudes below the board. This is what hits the mounting surface when the standoffs are too short.'],
+          ['`[mounts]`', '`X,Y,BoardHoleDia` -- one per line, each becomes a standoff. The diameter is the hole in the BOARD; the standoff\'s own size comes from the placement line.'],
+          ['`[cutouts]`', '`Side,Round,X,Y,Diameter,Clearance` or `Side,Rect,X,Y,SizeX,SizeY,CornerRadius,Clearance`. `Side` is `top` or `bottom` -- of the BOARD. `X,Y` is the centre.'],
+          ['`[edges]`', '`Edge,Round,Pos,Z,Diameter,Clearance` or `Edge,Rect,Pos,Z,Width,Height,CornerRadius,Clearance`. See below.'],
+          ['`[keepouts]`', 'Optional, reserved for finer clearance checks. `X,Y,SizeX,SizeY,Height,Side`, `X,Y` the centre.'],
+        ],
+      },
+      { type: 'heading', text: 'Connector cutouts -- [edges]' },
+      {
+        type: 'table',
+        headers: ['Field', 'Meaning'],
+        rows: [
+          ['`Edge`', '`x+`, `x-`, `y+`, `y-` -- which BOARD edge the connector sits on. `x+` is the edge at maximum board X, so viewed from the component side `x-` is the left edge and `y-` the bottom one.'],
+          ['`Pos`', 'Position along that edge, in board coordinates: board Y for an `x+`/`x-` edge, board X for a `y+`/`y-` edge.'],
+          ['`Z`', 'Centre height of the opening above the NON-component face -- so ADD the board thickness. A jack whose centre is 1.5 mm above a 1.6 mm board is `Z = 3.1`.'],
+          ['`Width`, `Height`', 'Rect only. `Width` runs along the edge, `Height` vertically.'],
+        ],
+      },
+      {
+        type: 'tip',
+        text:
+          'You never name a box wall in a board file. Which wall an edge faces is worked out from the surface, `Components` and `Rotation` -- turn the board 90 degrees and the same line cuts a different wall with no edit.',
+      },
+      { type: 'heading', text: 'Placement line' },
+      { type: 'code', text: 'Surface,X,Y,Rotation,Components,StandoffHeight,StandoffOD,StandoffHoleDia,HoleDepth,BaseFilletRadius,BoardName' },
+      {
+        type: 'table',
+        headers: ['Field', 'Meaning'],
+        rows: [
+          ['`Surface`', '`floor` or `lid`'],
+          ['`X`, `Y`', 'Where the board\'s `0,0` corner lands, in that surface\'s frame (see Coordinate Frames)'],
+          ['`Rotation`', 'CCW degrees about the board origin. MULTIPLES OF 90 ONLY.'],
+          ['`Components`', '`up` or `down` in world Z -- which way the component side faces once it is in the box'],
+          ['Standoff fields', 'The standoffs generated under this board. These belong to the BOX, not the board, which is why they are here and not in the file.'],
+          ['`BoardName`', 'The `Name` from an imported board file. Matched ignoring case.'],
+        ],
+      },
+      {
+        type: 'tip',
+        text:
+          'There is deliberately no "flip" checkbox. `Components up` or `down` says what you mean, and the mirroring follows from it -- board X mirrors exactly when the component side faces the mounting surface. A boolean gets this backwards in the commonest case: a display mounted under the lid facing its window IS the mirrored case.',
+      },
+      {
+        type: 'tip',
+        text:
+          'Rotation is CCW in the MOUNTING SURFACE\'s frame, and the lid frame is mirrored, so the same number spins a lid-mounted board the opposite way from a floor-mounted one. At rotation 0 there is nothing to notice.',
+      },
+      { type: 'heading', text: 'Example' },
+      {
+        type: 'code',
+        text:
+`// Surface, X, Y, Rot, Components, standoff H/OD/HoleDia/Depth/Fillet, Name
+lid,   80.5, 22, 0, up, 3.4, 4, 2.1, 3.4, 2, OLED2-42inch
+floor, 5,    15, 0, up, 5,   4, 2.1, 5,   2, feathstack1`,
+      },
+      { type: 'heading', text: 'Warnings' },
+      {
+        type: 'paragraph',
+        text:
+          'Board-generated standoffs and cutouts get exactly the same checks as hand-typed ones, and the same red highlights in the 3D view. Because they have no line in any textarea, a warning names where it came from instead -- for example `board "OLED2-42inch" mount 3`. Warnings appear under the Boards panel, not under Standoffs.',
+      },
+      {
+        type: 'tip',
+        text:
+          'A board emits ONE base fillet for its whole group. If a fillet drives clean through the outside of a wall you will get a warning; a fillet that merely reaches a wall, or overlaps a cutout, is harmless and is not flagged.',
+      },
+    ],
+  },
+  {
+    id: 'objects',
+    title: 'Objects',
+    blocks: [
+      {
+        type: 'paragraph',
+        text:
+          'Anything else that takes up room in the box: a battery, a potentiometer, a speaker, a relay. Like boards, an object is described once in its own reusable file and then placed. Unlike boards it has no mounting holes -- it is stuck down, or held by its own shaft through a wall.',
+      },
+      {
+        type: 'tip',
+        text:
+          'An object\'s BODY is never printed and never exported -- it exists to be drawn and checked for clearance. Its CUTOUTS are real geometry, because a potentiometer shaft needs a real hole.',
+      },
+      { type: 'heading', text: 'Object coordinate frame' },
+      {
+        type: 'list',
+        items: [
+          '`0,0,0` is a corner of the face that sits AGAINST the mounting surface.',
+          '`X` and `Y` run across that face; `+Z` runs AWAY from the surface, into the box.',
+          'There is no component side and no flip -- an object is just a box.',
+        ],
+      },
+      { type: 'heading', text: 'Object file' },
+      {
+        type: 'code',
+        text:
+`// 10k panel potentiometer
+[object]
+Name, Pot 10k
+Size, 16, 16, 22          // X, Y across the mounting face; Z away from it
+
+[cutouts]                  // Face, Shape, X, Y, Z, <args>, Clearance
+base, Round, 8, 8, 0, 7, 0.4`,
+      },
+      {
+        type: 'table',
+        headers: ['Field', 'Meaning'],
+        rows: [
+          ['`Face`', '`base` (the face against the mounting surface), `top` (opposite it), or `x+ x- y+ y-`'],
+          ['`X,Y,Z`', 'Centre of the hole in object coordinates. The axis perpendicular to the named face is IGNORED -- write `0` or the face\'s own value, whichever reads better.'],
+          ['`Width`, `Height`', 'Rect only. They run along the face\'s two free axes in X,Y,Z order: `base`/`top` are (X,Y), `x+`/`x-` are (Y,Z), `y+`/`y-` are (X,Z).'],
+        ],
+      },
+      {
+        type: 'tip',
+        text:
+          'As with boards, you never name a box wall. A `base` hole exits through whatever the object is stuck to, so the same pot file puts its shaft through the left wall when mounted there, and through the lid when it sits on the floor.',
+      },
+      { type: 'heading', text: 'Placement line' },
+      { type: 'code', text: 'Surface,X,Y,Rotation,Offset,ObjectName' },
+      {
+        type: 'table',
+        headers: ['Field', 'Meaning'],
+        rows: [
+          ['`Surface`', '`floor`, `lid`, `front`, `back`, `left` or `right` -- what it sits on or is stuck to'],
+          ['`X`, `Y`', 'Where the object\'s `0,0` corner lands, in that surface\'s frame'],
+          ['`Rotation`', 'CCW degrees, multiples of 90 only'],
+          ['`Offset`', 'Gap between the surface and the object\'s base face (0 = touching)'],
+          ['`ObjectName`', 'The `Name` from an imported object file'],
+        ],
+      },
+      { type: 'heading', text: 'Example' },
+      {
+        type: 'code',
+        text:
+`// against the far edge of the right wall, 3.7mm of velcro allowed for
+right, maxX - 25.42 - 3.7, 0, 0, 0, sen66
+back,  8, 35, 0, 0, encoder`,
+      },
+    ],
+  },
+  {
+    id: 'expressions',
+    title: 'Expressions & maxX',
+    blocks: [
+      {
+        type: 'paragraph',
+        text:
+          'Any numeric field in the Boards and Objects PLACEMENT textareas can be arithmetic instead of a bare number: `+ - * /`, parentheses and a leading minus. A plain number still means itself, so nothing you have already written changes.',
+      },
+      { type: 'heading', text: 'Names you can use' },
+      {
+        type: 'table',
+        headers: ['Name', 'Meaning'],
+        rows: [
+          ['`maxX`', 'The extent of the surface THIS LINE names, along its own X'],
+          ['`maxY`', 'The same, along its own Y'],
+          ['`maxZ`', 'The clear interior distance PERPENDICULAR to that surface -- across to whatever faces it'],
+        ],
+      },
+      {
+        type: 'paragraph',
+        text:
+          'For a wall those read as (along the wall, height, depth to the opposite wall). For the floor or the lid, `maxZ` is the clear height between them.',
+      },
+      { type: 'heading', text: 'Why not just type the number' },
+      {
+        type: 'code',
+        text:
+`// the number goes stale the moment the box is resized
+right, 36.88, 0, 0, 0, sen66
+
+// this stays against the far edge, whatever the box becomes
+right, maxX - 25.42 - 3.7, 0, 0, 0, sen66`,
+      },
+      {
+        type: 'tip',
+        text:
+          '`maxZ - 21.2` as an `Offset` pushes a 21.2 mm part across to the opposite wall. Between them the three names cover "put it against that edge" without needing a separate option for it.',
+      },
+      {
+        type: 'paragraph',
+        text:
+          'The values are the same ones the bounds warnings measure against, so `maxX` means exactly what "extends past the edge" means. There are deliberately no exterior box dimensions: everything you place is INSIDE, so an exterior number is only ever a two-wall-thicknesses error waiting to happen.',
+      },
+      {
+        type: 'tip',
+        text:
+          'Board and object FILES do not take expressions -- their numbers describe the part, not any particular box.',
+      },
+    ],
+  },
+  {
+    id: 'clearance',
+    title: 'Clearance & Interference',
+    blocks: [
+      {
+        type: 'paragraph',
+        text:
+          'Every placed board and object is drawn as a translucent box showing the space it occupies -- teal for a board, slate for an object, RED for anything overlapping something else. Toggle it with Show Clearance in Settings.',
+      },
+      {
+        type: 'tip',
+        text:
+          'The ghosts draw THROUGH the box walls, deliberately. They live inside a solid enclosure and would otherwise be invisible, which would defeat the point; the result is an x-ray of the contents without having to explode the view.',
+      },
+      {
+        type: 'paragraph',
+        text:
+          'A board\'s ghost is sized by its `Height` and `HeightBelow`, so measuring those is what makes a stacked assembly show its true bulk. A board with no `Height` is drawn as a bare PCB.',
+      },
+      {
+        type: 'paragraph',
+        text:
+          'Overlaps are also reported in words under the Boards and Objects panels, naming both parts and the overlap in all three axes -- colour alone does not tell you what hit what, or by how much. A board-versus-object clash is listed under both panels.',
       },
     ],
   },
@@ -456,6 +733,12 @@ floor,48,33,deboss,0.4,4,back,Open Sans,no,no,BoxMaker`,
         type: 'tip',
         text:
           'Toggle Show Origins in Settings to drop a small red marker at each surface\'s (0, 0) corner (offset 3 mm so it clears the inner corner radius) with `+X` / `+Y` axis labels showing the user-frame directions. Helps when you\'re first learning a surface\'s coord frame.',
+      },
+      { type: 'heading', text: 'Board and object frames' },
+      {
+        type: 'paragraph',
+        text:
+          'Boards and objects have their OWN local frames, described in those sections. A board is measured viewed from its component side; an object from the face that sits against the mounting surface. Neither ever refers to a box surface -- that is what lets one file be used in any box, on any face, at any quarter turn.',
       },
     ],
   },

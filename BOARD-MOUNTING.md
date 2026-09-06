@@ -667,7 +667,8 @@ board does not fit.
 - [x] Fillet handling settled -- auto-clamp rejected, exterior-breakthrough advisory
       shipped instead (section 11).
 - [ ] "Explode to raw lines" escape hatch.
-- [ ] Help panel section -- the single source of truth for user-facing semantics.
+- [x] Help panel sections (2026-09-05): Boards, Objects, Expressions & maxX, Clearance &
+      Interference, plus Quick Start and Coordinate Frames updated to point at them.
 
 ## 14. Future add-ons (not scheduled)
 
