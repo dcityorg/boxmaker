@@ -459,17 +459,29 @@ interface SurfaceInfo {
 }
 
 /**
- * The usable extent of a surface in its own user frame, as the bounds checks
- * see it. Exported so the `maxX` / `maxY` expression variables mean exactly
- * what "extends past the edge" means here, rather than a second opinion.
+ * The usable extent of a surface: `x` and `y` in its own user frame, `z`
+ * PERPENDICULAR to it -- the clear interior distance across to whatever faces
+ * it. Exported so the `maxX` / `maxY` / `maxZ` expression variables mean
+ * exactly what the bounds checks measure, rather than a second opinion.
+ *
+ * For a wall, that makes (x, y, z) read as (along the wall, height, depth to
+ * the opposite wall). For the floor or the lid, z is the clear height between
+ * them.
  */
 export function surfaceSpan(
   box: BoxParams,
   lid: LidParams,
   surface: CutoutParams['surface']
-): { x: number; y: number } {
+): { x: number; y: number; z: number } {
   const info = cutoutSurfaceInfo(box, lid, surface);
-  return { x: info.spanX, y: info.spanY };
+  const interior = interiorSpan(box);
+  const z =
+    surface === 'floor' || surface === 'lid'
+      ? box.height - box.floorThickness
+      : surface === 'front' || surface === 'back'
+        ? interior.y
+        : interior.x;
+  return { x: info.spanX, y: info.spanY, z };
 }
 
 function cutoutSurfaceInfo(box: BoxParams, lid: LidParams, surface: CutoutParams['surface']): SurfaceInfo {

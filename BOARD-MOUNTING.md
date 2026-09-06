@@ -820,8 +820,18 @@ the fields resolve **names** as well:
 | Name | Meaning |
 |---|---|
 | `maxX`, `maxY` | the extent of the surface THIS LINE names, in that surface's own user frame |
-| `boxL`, `boxW`, `boxH` | the box's exterior dimensions |
-| `wall`, `floor` | wall and floor thickness |
+| `maxZ` | the clear interior distance PERPENDICULAR to that surface -- across to whatever faces it |
+
+For a wall those read as (along the wall, height, depth to the opposite wall); for the
+floor or lid, `maxZ` is the clear height between them. `maxZ - 21.2` as an `Offset` pushes
+a 21.2 mm part across to the far side.
+
+**There are deliberately no exterior box dimensions.** `boxL` / `boxW` / `boxH` / `wall` /
+`floor` existed for about an hour before Gary asked what they were for. The honest answer
+was nothing: everything placed is INSIDE, so an exterior dimension is only ever a
+2x-wall-thickness error waiting to be made, and it would be made silently. The three `max*`
+names already answer every question those could. If a real need appears, the fix is a name
+that says what it is, not one that invites the mistake.
 
 So the line above becomes `right, maxX - 25.42 - 3.7, 0, 0, 0, sen66` and keeps meaning
 "against the far edge with a 3.7 mm gap" forever. It also answers what Gary had considered

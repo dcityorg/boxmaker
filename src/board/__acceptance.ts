@@ -500,6 +500,8 @@ check('unbalanced parens are an error', ev('(1 + 2').error !== null);
 check('an unknown name is an error naming what IS known',
   /unknown name "nope".*known: maxX/.test(ev('nope', { maxX: 5 }).error ?? ''),
   ev('nope', { maxX: 5 }).error ?? '');
+check('the retired exterior names are now unknown, not silently wrong',
+  parseObjectPlacementsText('floor, boxW, 0, 0, 0, x', { box: BOX, lid: LID }).errors.length === 1);
 
 console.log('\n[19b] ACCEPTANCE: maxX puts a part against the far edge');
 // Gary's actual line was `right,46.88,...` with 46.88 derived in a comment from
@@ -516,6 +518,21 @@ check('maxY is the OTHER axis of the same surface',
 check('maxX differs per surface -- the floor is longer than the right wall',
   parseObjectPlacementsText('floor, maxX, 0, 0, 0, x', CTX).placements[0].x ===
     BOX.length - 2 * BOX.wallThickness);
+// maxZ is the clear distance ACROSS from the named surface, so `maxZ - depth`
+// as an Offset pushes a part over to the opposite wall.
+check('maxZ on a wall is the interior depth to the opposite wall',
+  near(parseObjectPlacementsText('right, 0, 0, 0, maxZ, x', CTX).placements[0].offset,
+       BOX.length - 2 * BOX.wallThickness, 1e-9),
+  `${parseObjectPlacementsText('right, 0, 0, 0, maxZ, x', CTX).placements[0].offset}`);
+check('maxZ on the front wall is the OTHER horizontal axis',
+  near(parseObjectPlacementsText('front, 0, 0, 0, maxZ, x', CTX).placements[0].offset,
+       BOX.width - 2 * BOX.wallThickness, 1e-9));
+check('maxZ on the floor is the clear height to the lid',
+  near(parseObjectPlacementsText('floor, 0, 0, 0, maxZ, x', CTX).placements[0].offset,
+       BOX.height - BOX.floorThickness, 1e-9));
+check('maxZ - depth puts a part against the opposite wall',
+  near(parseObjectPlacementsText('right, 0, 0, 0, maxZ - 21.2, x', CTX).placements[0].offset,
+       BOX.length - 2 * BOX.wallThickness - 21.2, 1e-9));
 check('board placements take expressions too',
   near(parseBoardsText('floor, maxX - 10, 0, 0, up, 6, 6, 2.6, 8, 1, B', CTX).placements[0].x,
        BOX.length - 2 * BOX.wallThickness - 10, 1e-9));

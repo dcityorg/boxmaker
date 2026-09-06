@@ -17,13 +17,21 @@ export interface PlacementContext {
 /**
  * The names available in a placement line's numeric fields.
  *
- * `maxX` and `maxY` are the extent of the surface THIS LINE names, in that
- * surface's own user frame -- so `maxX - 25.42 - 3.7` puts a part against the
- * far edge with a 3.7 mm gap, and keeps doing so after the box is resized. They
- * come from surfaceSpan() in validation/checks.ts, so they agree exactly with
- * what the "extends past the edge" warning measures.
+ * All three are the extent of the surface THIS LINE names: `maxX` and `maxY` in
+ * that surface's own user frame, `maxZ` perpendicular to it -- the clear
+ * interior distance across to whatever faces it. For a wall they read as
+ * (along the wall, height, depth to the opposite wall).
  *
- * The box dimensions are here too, for the cases the spans do not cover.
+ * So `maxX - 25.42 - 3.7` puts a part against the far edge with a 3.7 mm gap,
+ * and `maxZ - 21.2` as an Offset pushes it across to the opposite wall. Both
+ * keep meaning that after the box is resized.
+ *
+ * There are deliberately NO exterior box dimensions here. Gary asked what
+ * boxL/boxW/boxH were for and the honest answer was nothing: everything placed
+ * is INSIDE, so an exterior dimension is only ever a 2x-wall-thickness error
+ * waiting to be made, and silently. maxX/maxY/maxZ already answer every
+ * question they could. If a real need turns up, add a name that says what it
+ * is rather than one that invites the mistake.
  */
 export function placementVariables(
   ctx: PlacementContext | undefined,
@@ -31,24 +39,8 @@ export function placementVariables(
 ): Variables {
   if (!ctx) return {};
   const span = surfaceSpan(ctx.box, ctx.lid, surface);
-  return {
-    maxX: span.x,
-    maxY: span.y,
-    boxL: ctx.box.length,
-    boxW: ctx.box.width,
-    boxH: ctx.box.height,
-    wall: ctx.box.wallThickness,
-    floor: ctx.box.floorThickness,
-  };
+  return { maxX: span.x, maxY: span.y, maxZ: span.z };
 }
 
 /** Human-readable list for error messages and the sidebar legend. */
-export const PLACEMENT_VARIABLE_NAMES = [
-  'maxX',
-  'maxY',
-  'boxL',
-  'boxW',
-  'boxH',
-  'wall',
-  'floor',
-] as const;
+export const PLACEMENT_VARIABLE_NAMES = ['maxX', 'maxY', 'maxZ'] as const;
