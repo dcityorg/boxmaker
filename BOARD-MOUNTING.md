@@ -643,7 +643,7 @@ board and a battery that must not collide.
       rotation is restricted to quarter turns and objects are rectangular.
 - [x] Translucent x-ray ghosts, red on overlap, Settings -> Show Clearance.
 - [x] 18 acceptance checks against hand-computed envelopes and overlap cases.
-- [ ] Interference reported as text warnings, not only as colour.
+- [x] Interference reported as text warnings, not only as colour (2026-09-05).
 
 ### Phase 1.6 -- objects become reusable files (done 2026-09-02)
 
@@ -660,7 +660,7 @@ board and a battery that must not collide.
 Connector cutouts moved into phase 1. What is left is everything that tells the user their
 board does not fit.
 
-- [ ] `boardWarnings()` in `validation/checks.ts`, plus its viewport ghosts (section 7).
+- [x] Compiled features validated and ghosted, with provenance (2026-09-05, section 18).
 - [ ] Keepout slabs in the ghost view (section 8 covers the board envelope already).
 - [ ] Warning when a projected connector cutout misses its wall or crosses a corner.
 - [ ] Warning when a compiled cutout falls outside its target surface.
@@ -757,3 +757,41 @@ the app" in section 14.
 everything restored -- which is the confirmation that the `designFileFromState` fix
 (commit `18dd2e4`) actually closed the data-loss hole where Save Design and Share Link were
 dropping `boardsText`, `boardLibrary`, `objectsText` and `objectLibrary`.
+
+---
+
+## 18. Validating compiled features
+
+Added 2026-09-05. Until then, board- and object-generated features got **no validation at
+all**: `StandoffsControls` checked only what was typed into its own textarea, so a board
+could put a standoff through the lid, or a cutout off the edge of a wall, and nothing said
+a word.
+
+Gary's own `AirQualitySensor2Box.boxmakerTEST.json` is what made the size of the hole
+obvious: it compiles to **12 standoffs and 7 cutouts with `standoffsText` and `cutoutsText`
+both empty**. Every feature in that box was unvalidated.
+
+**Provenance.** A compiled feature has no line in any textarea, so pointing at one would
+send the reader somewhere unrelated. `StandoffParams` and `CutoutParams` gained an optional
+`source` -- `board "OLED2-42inch" mount 3`, `object "sen66" cutout 1`,
+`board "feathstack1" connector 1` -- set by the compilers and ignored by geometry.
+`DesignWarning` carries it too, and `attribute()` in `checks.ts` swaps `line` for `source`
+on every warning an item produced, including the early-`continue` paths.
+
+**Where they show.** In the Boards and Objects panels, not in Standoffs and Cutouts: a
+warning about a board's standoff belongs where the board is. `WarningMarkers` now reads the
+*effective* lists, so a compiled feature gets the same red ghost a typed one does.
+
+**Interference in words.** The clearance ghosts already turned red on a clash, but colour
+alone does not say what hits what, or by how much -- and a red shape inside an opaque wall
+is not a diagnosis. `interferenceWarnings` reports each pair once with the overlap in all
+three axes. A board-versus-object clash appears in **both** panels deliberately: it is
+equally the business of either, and being told twice beats being told in the panel you are
+not looking at.
+
+Envelope labels use the **definition's** name rather than the placement's spelling of it,
+since lookup is case-insensitive and the two can differ.
+
+**Found immediately, in Gary's own autosaved work-in-progress:** two `veml7700` standoffs
+lying completely outside the lid pocket, its cutout cutting nothing, and `sen6x` sitting
+inside the OLED's outline overlapping it by 1 mm in Z. None of those were reported before.

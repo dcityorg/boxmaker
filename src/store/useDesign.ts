@@ -83,6 +83,12 @@ export interface StandoffParams {
   /** 1-based source line in the textarea; set by the parser so validation
    *  warnings can point back at the offending line. */
   line?: number;
+  /**
+   * Set instead of `line` on features a board or object COMPILED into being --
+   * e.g. `board "OLED2-42inch" mount 3`. Those have no line in any textarea, so
+   * a warning has to say where they actually came from. Geometry ignores it.
+   */
+  source?: string;
   surface: 'floor' | 'lid';
   x: number;          // mm from interior front-left, along box length
   y: number;          // mm from interior front-left, along box width
@@ -123,6 +129,7 @@ export type CutoutSurface = 'front' | 'back' | 'left' | 'right' | 'floor' | 'lid
 export type CutoutParams =
   | {
       line?: number;   // 1-based textarea line, set by the parser
+      source?: string; // set instead of `line` on compiled features; see StandoffParams
       surface: CutoutSurface;
       kind: 'round';
       x: number;
@@ -131,6 +138,7 @@ export type CutoutParams =
     }
   | {
       line?: number;   // 1-based textarea line, set by the parser
+      source?: string; // set instead of `line` on compiled features; see StandoffParams
       surface: CutoutSurface;
       kind: 'rect';
       x: number;

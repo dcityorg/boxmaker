@@ -37,6 +37,12 @@ export interface DesignWarning {
   severity: 'hard' | 'advisory';
   /** 1-based textarea line, for per-line (standoff/cutout/label) checks. */
   line?: number;
+  /**
+   * Where a COMPILED feature came from, e.g. `board "OLED2-42inch" mount 3`.
+   * Set instead of `line`, because such a feature has no line in any textarea
+   * and pointing at one would send the reader to the wrong place entirely.
+   */
+  source?: string;
   message: string;
   ghost?: WarningGhost;
 }
@@ -234,10 +240,12 @@ export function standoffWarnings(
 
   for (const s of standoffs) {
     const line = s.line;
+    const first = warnings.length;
     const r = s.od / 2;
 
     if (s.od <= 0 || s.height <= 0) {
       warnings.push({ severity: 'hard', line, message: 'OD and Height must be > 0.' });
+      attribute(warnings, first, s.source);
       continue;
     }
     if (s.holeDia > 0 && s.holeDia >= s.od) {
@@ -378,8 +386,23 @@ export function standoffWarnings(
         });
       }
     }
+
+    attribute(warnings, first, s.source);
   }
   return warnings;
+}
+
+/**
+ * Re-attribute the warnings this item just produced. A compiled feature has no
+ * textarea line, so pointing at one would send the reader somewhere unrelated;
+ * name where it actually came from instead.
+ */
+function attribute(warnings: DesignWarning[], first: number, source: string | undefined): void {
+  if (!source) return;
+  for (let i = first; i < warnings.length; i++) {
+    warnings[i].source = source;
+    warnings[i].line = undefined;
+  }
 }
 
 /** Red disc over just the fillet skirt at a floor standoff's base. */
@@ -519,17 +542,20 @@ export function cutoutWarnings(
   const warnings: DesignWarning[] = [];
   for (const c of cutouts) {
     const line = c.line;
+    const first = warnings.length;
     let ex: number; // half-extent in user X
     let ey: number;
     if (c.kind === 'round') {
       if (c.diameter <= 0) {
         warnings.push({ severity: 'hard', line, message: 'Diameter must be > 0.' });
+        attribute(warnings, first, c.source);
         continue;
       }
       ex = ey = c.diameter / 2;
     } else {
       if (c.width <= 0 || c.height <= 0) {
         warnings.push({ severity: 'hard', line, message: 'HoleX and HoleY must be > 0.' });
+        attribute(warnings, first, c.source);
         continue;
       }
       ex = c.width / 2;
@@ -538,7 +564,10 @@ export function cutoutWarnings(
 
     const info = cutoutSurfaceInfo(box, lid, c.surface);
     const fit = boundsFit(c.x - ex, c.x + ex, c.y - ey, c.y + ey, info.spanX, info.spanY);
-    if (fit === 'inside') continue;
+    if (fit === 'inside') {
+      attribute(warnings, first, c.source);
+      continue;
+    }
 
     const ghost = cutoutGhost(box, lid, c);
     if (fit === 'outside') {
@@ -564,6 +593,8 @@ export function cutoutWarnings(
         ghost,
       });
     }
+
+    attribute(warnings, first, c.source);
   }
   return warnings;
 }

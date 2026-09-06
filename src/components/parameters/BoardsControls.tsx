@@ -1,12 +1,15 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
-import { Section } from './ui';
+import { Section, WarningList } from './ui';
 import { GROUP_COLORS } from '@/config/colors';
 import { useDesign } from '@/store/useDesign';
 import { parseBoardFile } from '@/board/parseBoard';
 import { useEffectiveFeatures } from '@/board/compileAll';
+import { interferenceFor } from '@/board/envelopes';
+import { useEnvelopes } from '@/board/useEnvelopes';
+import { standoffWarnings, cutoutWarnings } from '@/validation/checks';
 import {
   forgetHandle,
   getHandle,
@@ -30,7 +33,22 @@ export function BoardsControls() {
   const addBoard = useDesign((s) => s.addBoardToLibrary);
   const removeBoard = useDesign((s) => s.removeBoardFromLibrary);
 
-  const { boardErrors } = useEffectiveFeatures();
+  const box = useDesign((s) => s.box);
+  const lid = useDesign((s) => s.lid);
+  const { boardErrors, boardStandoffs, boardCutouts } = useEffectiveFeatures();
+  const envelopes = useEnvelopes();
+
+  // Board-generated features get the SAME checks as hand-entered ones. Until
+  // now they got none at all: a board could put a standoff through the lid or a
+  // cutout off the edge of a wall and nothing said a word.
+  const warnings = useMemo(
+    () => [
+      ...standoffWarnings(box, lid, boardStandoffs),
+      ...cutoutWarnings(box, lid, boardCutouts),
+      ...interferenceFor('board', envelopes, box, lid),
+    ],
+    [box, lid, boardStandoffs, boardCutouts, envelopes]
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Bumps on every refresh so the row's icon can flash; also forces a re-render
   // so hasHandle() is re-read after an import.
@@ -325,6 +343,11 @@ export function BoardsControls() {
             · {boardErrors.length} unresolved
           </span>
         )}
+        {warnings.length > 0 && (
+          <span className="text-amber-400 ml-2">
+            · {warnings.length} warning{warnings.length === 1 ? '' : 's'}
+          </span>
+        )}
       </div>
       {errors.length > 0 && (
         <ul className="text-[10px] text-red-400 mt-1 pl-3 list-disc">
@@ -342,6 +365,7 @@ export function BoardsControls() {
           ))}
         </ul>
       )}
+      <WarningList warnings={warnings} />
     </Section>
   );
 }

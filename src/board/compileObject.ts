@@ -108,13 +108,14 @@ export function compileObject(
 
   const base = surfaceBasis(placement.surface, box, lid);
 
-  for (const c of obj.cutouts) {
+  obj.cutouts.forEach((c, ci) => {
     const dirWorld = localDirToWorld(base, q, FACE_NORMAL[c.face]);
     const target = surfaceFacing(dirWorld);
     if (target === null) {
       errors.push(`object "${obj.name}": could not resolve which wall the ${c.face} face points at`);
-      continue;
+      return;
     }
+    const src = `object "${obj.name}" cutout ${ci + 1}`;
 
     const pWorld = localPointToWorld(placement, base, q, c.x, c.y, c.z);
     const targetBasis = surfaceBasis(target, box, lid);
@@ -124,10 +125,10 @@ export function compileObject(
       const diameter = c.diameter + 2 * c.clearance;
       if (diameter <= 0) {
         errors.push(`object "${obj.name}": ${c.face} cutout has non-positive size`);
-        continue;
+        return;
       }
-      cutouts.push({ surface: target, kind: 'round', x, y, diameter });
-      continue;
+      cutouts.push({ source: src, surface: target, kind: 'round', x, y, diameter });
+      return;
     }
 
     // Which of the target surface's axes the object's Width axis landed on.
@@ -141,9 +142,10 @@ export function compileObject(
     const height = (alongU ? c.height : c.width) + 2 * c.clearance;
     if (width <= 0 || height <= 0) {
       errors.push(`object "${obj.name}": ${c.face} cutout has non-positive size`);
-      continue;
+      return;
     }
     cutouts.push({
+      source: src,
       surface: target,
       kind: 'rect',
       x,
@@ -153,7 +155,7 @@ export function compileObject(
       // Clearance changes size only, as everywhere else.
       cornerRadius: Math.max(0, c.cornerRadius),
     });
-  }
+  });
 
   return { cutouts, errors };
 }

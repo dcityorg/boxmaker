@@ -107,6 +107,10 @@ export function effectiveFeatures(state: {
   cutouts: CutoutParams[];
   boardErrors: string[];
   objectErrors: string[];
+  /** Just the compiled features, so a panel can validate what IT produced. */
+  boardStandoffs: StandoffParams[];
+  boardCutouts: CutoutParams[];
+  objectCutouts: CutoutParams[];
 } {
   const boards = compileBoards(state.boards, state.boardLibrary, state.box, state.lid);
   // An object's BODY is never geometry, but its cutouts are: a potentiometer
@@ -117,6 +121,9 @@ export function effectiveFeatures(state: {
     cutouts: [...state.cutouts, ...boards.cutouts, ...objects.cutouts],
     boardErrors: boards.errors,
     objectErrors: objects.errors,
+    boardStandoffs: boards.standoffs,
+    boardCutouts: boards.cutouts,
+    objectCutouts: objects.cutouts,
   };
 }
 
@@ -126,12 +133,7 @@ export function effectiveFeatures(state: {
  * components use them as effect dependencies and would rebuild forever
  * otherwise.
  */
-export function useEffectiveFeatures(): {
-  standoffs: StandoffParams[];
-  cutouts: CutoutParams[];
-  boardErrors: string[];
-  objectErrors: string[];
-} {
+export function useEffectiveFeatures(): ReturnType<typeof effectiveFeatures> {
   const box = useDesign((s) => s.box);
   const lid = useDesign((s) => s.lid);
   const standoffs = useDesign((s) => s.standoffs);

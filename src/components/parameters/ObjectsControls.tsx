@@ -1,12 +1,15 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
-import { Section } from './ui';
+import { Section, WarningList } from './ui';
 import { GROUP_COLORS } from '@/config/colors';
 import { useDesign } from '@/store/useDesign';
 import { parseObjectFile } from '@/board/parseObject';
 import { useEffectiveFeatures } from '@/board/compileAll';
+import { interferenceFor } from '@/board/envelopes';
+import { useEnvelopes } from '@/board/useEnvelopes';
+import { cutoutWarnings } from '@/validation/checks';
 import {
   forgetHandle,
   getHandle,
@@ -31,7 +34,18 @@ export function ObjectsControls() {
   const addObject = useDesign((s) => s.addObjectToLibrary);
   const removeObject = useDesign((s) => s.removeObjectFromLibrary);
 
-  const { objectErrors } = useEffectiveFeatures();
+  const box = useDesign((s) => s.box);
+  const lid = useDesign((s) => s.lid);
+  const { objectErrors, objectCutouts } = useEffectiveFeatures();
+  const envelopes = useEnvelopes();
+
+  const warnings = useMemo(
+    () => [
+      ...cutoutWarnings(box, lid, objectCutouts),
+      ...interferenceFor('object', envelopes, box, lid),
+    ],
+    [box, lid, objectCutouts, envelopes]
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [, bump] = useState(0);
 
@@ -250,6 +264,11 @@ export function ObjectsControls() {
         {objectErrors.length > 0 && (
           <span className="text-red-400 ml-2">· {objectErrors.length} unresolved</span>
         )}
+        {warnings.length > 0 && (
+          <span className="text-amber-400 ml-2">
+            · {warnings.length} warning{warnings.length === 1 ? '' : 's'}
+          </span>
+        )}
       </div>
       {errors.length > 0 && (
         <ul className="text-[10px] text-red-400 mt-1 pl-3 list-disc">
@@ -267,6 +286,7 @@ export function ObjectsControls() {
           ))}
         </ul>
       )}
+      <WarningList warnings={warnings} />
     </Section>
   );
 }

@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { useDesign } from '@/store/useDesign';
 import { lidAssembledOffset } from '@/geometry/lid';
 import { collectGhosts, type WarningGhost } from '@/validation/checks';
+import { useEffectiveFeatures } from '@/board/compileAll';
 
 /**
  * Translucent red "ghost" overlays for validation warnings that have a
@@ -74,8 +75,9 @@ function GhostMesh({ ghost, lidZ }: { ghost: WarningGhost; lidZ: number }) {
 export function WarningMarkers() {
   const box = useDesign((s) => s.box);
   const lid = useDesign((s) => s.lid);
-  const standoffs = useDesign((s) => s.standoffs);
-  const cutouts = useDesign((s) => s.cutouts);
+  // Effective, not just hand-entered: a board can put a standoff through the
+  // lid exactly as a typed one can, and it deserves the same red marker.
+  const { standoffs, cutouts } = useEffectiveFeatures();
   const textLabels = useDesign((s) => s.textLabels);
   const view = useDesign((s) => s.appearance.view);
 

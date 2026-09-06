@@ -58,9 +58,10 @@ export function compileBoard(
   }
 
   // --- mounting holes -> standoffs, always on the mounting surface ---------
-  for (const m of board.mounts) {
+  board.mounts.forEach((m, i) => {
     const { x, y } = boardToSurface(placement, m.x, m.y);
     standoffs.push({
+      source: `board "${board.name}" mount ${i + 1}`,
       surface: placement.surface,
       x,
       y,
@@ -70,12 +71,13 @@ export function compileBoard(
       holeDepth: placement.standoffHoleDepth,
       baseFillet: placement.baseFillet,
     });
-  }
+  });
 
   // --- component cutouts -> whichever of floor/lid the feature points at ---
   const swapped = quarter % 2 === 1;
 
-  for (const c of board.cutouts) {
+  board.cutouts.forEach((c, ci) => {
+    const src = `board "${board.name}" cutout ${ci + 1}`;
     const target = targetSurface(c.side, placement.components);
     const local = boardToSurface(placement, c.x, c.y);
     const { x, y } = convertFrame(placement.surface, target, local.x, local.y, box, lid);
@@ -84,10 +86,10 @@ export function compileBoard(
       const diameter = c.diameter + 2 * c.clearance;
       if (diameter <= 0) {
         errors.push(`board "${board.name}": round cutout at ${c.x},${c.y} has non-positive size`);
-        continue;
+        return;
       }
-      cutouts.push({ surface: target, kind: 'round', x, y, diameter });
-      continue;
+      cutouts.push({ source: src, surface: target, kind: 'round', x, y, diameter });
+      return;
     }
 
     // A quarter turn swaps a rectangle's two dimensions; the surface frames'
@@ -97,9 +99,10 @@ export function compileBoard(
     const height = (swapped ? c.sizeX : c.sizeY) + 2 * c.clearance;
     if (width <= 0 || height <= 0) {
       errors.push(`board "${board.name}": rect cutout at ${c.x},${c.y} has non-positive size`);
-      continue;
+      return;
     }
     cutouts.push({
+      source: src,
       surface: target,
       kind: 'rect',
       x,
@@ -113,10 +116,10 @@ export function compileBoard(
       // The radius is whatever they asked for.
       cornerRadius: Math.max(0, c.cornerRadius),
     });
-  }
+  });
 
   // --- connector cutouts -> whichever side wall the board edge faces -------
-  for (const e of board.edges) {
+  board.edges.forEach((e, ei) => {
     const wall = wallFacedBy(placement, e.edge, quarter);
     const point = edgePoint(board, e.edge, e.pos);
     const local = boardToSurface(placement, point[0], point[1]);
@@ -125,23 +128,25 @@ export function compileBoard(
     // Wall frames measure Y up from the INTERIOR floor, not from z = 0.
     const y = boardZToWorldZ(placement, board, e.z, box) - box.floorThickness;
 
+    const src = `board "${board.name}" connector ${ei + 1}`;
     if (e.kind === 'round') {
       const diameter = e.diameter + 2 * e.clearance;
       if (diameter <= 0) {
         errors.push(`board "${board.name}": ${e.edge} connector has non-positive size`);
-        continue;
+        return;
       }
-      cutouts.push({ surface: wall, kind: 'round', x, y, diameter });
-      continue;
+      cutouts.push({ source: src, surface: wall, kind: 'round', x, y, diameter });
+      return;
     }
 
     const width = e.width + 2 * e.clearance;
     const height = e.height + 2 * e.clearance;
     if (width <= 0 || height <= 0) {
       errors.push(`board "${board.name}": ${e.edge} connector has non-positive size`);
-      continue;
+      return;
     }
     cutouts.push({
+      source: src,
       surface: wall,
       kind: 'rect',
       x,
@@ -151,7 +156,7 @@ export function compileBoard(
       // Size only -- see the note on component cutouts above.
       cornerRadius: Math.max(0, e.cornerRadius),
     });
-  }
+  });
 
   return { standoffs, cutouts, errors };
 }

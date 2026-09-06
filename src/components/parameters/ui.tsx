@@ -286,12 +286,15 @@ export function Section({
 /**
  * Amber warning boxes for design-validation results (src/validation/checks.ts).
  * Semantic warnings only -- parse errors keep the existing red list style.
- * Warnings with a `line` get a "line N:" prefix pointing at the textarea.
+ * Warnings with a `line` get a "line N:" prefix pointing at the textarea. A
+ * warning from a COMPILED feature has no line -- it names its source instead,
+ * e.g. `board "OLED2-42inch" mount 3`, because pointing at a textarea row that
+ * does not contain it would send the reader to the wrong place.
  */
 export function WarningList({
   warnings,
 }: {
-  warnings: { line?: number; message: string }[];
+  warnings: { line?: number; source?: string; message: string }[];
 }) {
   if (warnings.length === 0) return null;
   return (
@@ -302,7 +305,8 @@ export function WarningList({
           className="text-[10px] px-2 py-1.5 rounded bg-amber-500/10 border border-amber-500/30 text-[var(--text-secondary)] leading-snug"
         >
           <span className="font-medium text-amber-400">
-            Warning: {w.line !== undefined && `line ${w.line}: `}
+            Warning:{' '}
+            {w.line !== undefined ? `line ${w.line}: ` : w.source ? `${w.source}: ` : ''}
           </span>
           {w.message}
         </div>

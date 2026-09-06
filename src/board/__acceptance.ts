@@ -15,10 +15,11 @@ import { parseBoardFile, normalizeBoardDefinition } from './parseBoard';
 import { parseBoardsText } from './parsePlacements';
 import { compileBoard, convertFrame, isMirrored, targetSurface, boardToSurface, wallFacedBy, boardZToWorldZ } from './compile';
 import type { BoardEdge, BoardPlacement, ObjectPlacement } from './types';
-import { boardEnvelope, objectEnvelope, envelopesOverlap } from './envelopes';
+import { boardEnvelope, objectEnvelope, envelopesOverlap, interferenceWarnings, interferenceFor } from './envelopes';
 import { parseObjectFile } from './parseObject';
 import { parseObjectPlacementsText } from './parseObjectPlacements';
 import { compileObject } from './compileObject';
+import { standoffWarnings } from '../validation/checks';
 
 const BOX: BoxParams = {
   mode: 'exterior', length: 125, width: 82, height: 76,
@@ -418,6 +419,50 @@ check('every coordinate is finite',
   JSON.stringify([le2.min, le2.max]));
 check('missing Height falls back to the bare board thickness',
   near(le2.max[2] - le2.min[2], 1.6, 1e-9), `${le2.max[2] - le2.min[2]}`);
+
+const boardAt2 = (x: number, y: number) =>
+  boardEnvelope({ ...mk('floor', 'up'), x, y, standoffHeight: 6 }, tall.board!, BOX, LID);
+const potAt2 = (surface: ObjectPlacement['surface'], x: number, y: number) =>
+  objectEnvelope({ surface, x, y, rotation: 0, offset: 0, objectName: 'Pot 10k' }, pot.object!, BOX, LID)!;
+
+console.log('\n[17c] compiled features carry provenance, not a textarea line');
+// A board-generated standoff has no line in any textarea, so a warning about it
+// must name where it came from instead of pointing somewhere unrelated.
+const provOut = compileBoard(placements[0], board!, BOX, LID);
+check('standoffs are tagged with board and mount number',
+  provOut.standoffs[0].source === 'board "OLED" mount 1' &&
+  provOut.standoffs[3].source === 'board "OLED" mount 4',
+  `${provOut.standoffs[0].source} / ${provOut.standoffs[3].source}`);
+check('standoffs carry no textarea line', provOut.standoffs.every((x) => x.line === undefined));
+check('cutouts are tagged too', provOut.cutouts[0].source === 'board "OLED" cutout 1',
+  `${provOut.cutouts[0].source}`);
+check('object cutouts name the object', potOut.cutouts[0].source === 'object "Pot 10k" cutout 1',
+  `${potOut.cutouts[0].source}`);
+check('a connector names its index',
+  rigOut.cutouts[0].source === 'board "Connector rig" connector 1', `${rigOut.cutouts[0].source}`);
+
+// The warning must then be attributed, and must NOT claim a line number.
+const offPocket = standoffWarnings(BOX, LID, [
+  { ...provOut.standoffs[0], x: 500, y: 500 },
+]);
+check('a compiled standoff warns with its source and no line',
+  offPocket.length > 0 && offPocket[0].source === 'board "OLED" mount 1' &&
+  offPocket[0].line === undefined,
+  JSON.stringify(offPocket[0]));
+
+console.log('\n[17d] interference is reported in words, not just colour');
+const clashPair = interferenceWarnings(
+  [potAt2('floor', 20, 30), boardAt2(20, 30)], BOX, LID
+);
+check('one clash, named both ways by their DEFINITION names, not the placement spelling',
+  clashPair.length === 1 && clashPair[0].a === 'Pot 10k' && clashPair[0].b === 'Stack',
+  JSON.stringify(clashPair[0]));
+check('the message says by how much',
+  /overlaps Stack by [\d.]+ x [\d.]+ x [\d.]+ mm/.test(clashPair[0].message),
+  clashPair[0].message);
+check('a board-vs-object clash shows in BOTH sections',
+  interferenceFor('board', [potAt2('floor', 20, 30), boardAt2(20, 30)], BOX, LID).length === 1 &&
+  interferenceFor('object', [potAt2('floor', 20, 30), boardAt2(20, 30)], BOX, LID).length === 1);
 
 console.log('\n[18] interference detection');
 const boardAt = (x: number, y: number) =>
