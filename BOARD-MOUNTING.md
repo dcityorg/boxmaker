@@ -795,3 +795,61 @@ since lookup is case-insensitive and the two can differ.
 **Found immediately, in Gary's own autosaved work-in-progress:** two `veml7700` standoffs
 lying completely outside the lid pocket, its cutout cutting nothing, and `sen6x` sitting
 inside the OLED's outline overlapping it by 1 mm in Z. None of those were reported before.
+
+---
+
+## 19. Expressions in placement fields
+
+Added 2026-09-05. Any numeric field in the **boards** and **objects** placement textareas
+may be an arithmetic expression: `+ - * /`, parentheses, unary minus, and named values.
+
+The prompt was this, from Gary's own design:
+
+```
+//x = internal width - sensor x - command strip thickness
+// x=76 - 25.42 - 3.7 = 36.88
+right,46.88,0,0,0,sen66
+```
+
+Three inputs, one result, and a comment that goes stale the moment any of them changes.
+
+**Plain arithmetic alone would not have been enough.** `76 - 25.42 - 3.7` still hard-codes
+the interior width, which is wrong the moment the box is resized -- and wrong silently. So
+the fields resolve **names** as well:
+
+| Name | Meaning |
+|---|---|
+| `maxX`, `maxY` | the extent of the surface THIS LINE names, in that surface's own user frame |
+| `boxL`, `boxW`, `boxH` | the box's exterior dimensions |
+| `wall`, `floor` | wall and floor thickness |
+
+So the line above becomes `right, maxX - 25.42 - 3.7, 0, 0, 0, sen66` and keeps meaning
+"against the far edge with a 3.7 mm gap" forever. It also answers what Gary had considered
+asking for as a separate "move to max X" option -- one expression covers that and every
+variation of it.
+
+`maxX` / `maxY` come from `surfaceSpan()` in `validation/checks.ts`, exported for the
+purpose, so they mean **exactly** what the "extends past the edge" warning measures rather
+than being a second opinion about the same thing.
+
+**Placements are no longer a pure function of their text.** Resizing the box changes what
+they evaluate to, so `setBox`, `resetBox`, `setLid`, `resetLid`, `loadDesign` and the undo
+`apply` all re-derive them through `reparsePlacements()` in the store. Miss one and the
+placements silently keep stale numbers.
+
+**Verified in the app**, which is the only place the re-parse wiring can be exercised.
+With `sen66` on the right wall and the box width taken from 70 to 50:
+
+| Position written as | Width | Warnings |
+|---|---|---|
+| `36.88` | 70 | 0 |
+| `36.88` | 50 | **3** -- every sen66 cutout now hangs off the wall |
+| `maxX - 25.42 - 3.7` | 50 | 0 -- the part moved with the wall |
+
+**Notes.** A bare number still parses to itself, so nothing that worked before changes --
+except that trailing rubbish (`46.88abc`) is now an error where `parseFloat` silently
+ignored it, which is a strictly better answer. Results carry ordinary floating-point drift
+(`76 - 25.42 - 3.7` is `46.879999999999995`) and are deliberately NOT rounded: the app
+already stores slider artifacts like `2.8000000000000003`, and 5e-15 mm is not a geometry
+problem. Board and object FILES do not take expressions -- their numbers are properties of
+the part, not of any box -- though arithmetic there would be easy to add.

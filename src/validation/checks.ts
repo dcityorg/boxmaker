@@ -458,6 +458,20 @@ interface SurfaceInfo {
   thickness: number;
 }
 
+/**
+ * The usable extent of a surface in its own user frame, as the bounds checks
+ * see it. Exported so the `maxX` / `maxY` expression variables mean exactly
+ * what "extends past the edge" means here, rather than a second opinion.
+ */
+export function surfaceSpan(
+  box: BoxParams,
+  lid: LidParams,
+  surface: CutoutParams['surface']
+): { x: number; y: number } {
+  const info = cutoutSurfaceInfo(box, lid, surface);
+  return { x: info.spanX, y: info.spanY };
+}
+
 function cutoutSurfaceInfo(box: BoxParams, lid: LidParams, surface: CutoutParams['surface']): SurfaceInfo {
   const interior = interiorSpan(box);
   const wallY = box.height - box.floorThickness;

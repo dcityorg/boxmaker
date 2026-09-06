@@ -1,6 +1,8 @@
 'use client';
 
 import type { BoardPlacement, BoardPlacementParseError, ComponentsFacing } from './types';
+import { evaluateExpression } from './expr';
+import { placementVariables, type PlacementContext } from './placementVars';
 
 /** How many commas precede the free-text BoardName field. */
 const NAME_FIELD_INDEX = 10;
@@ -28,7 +30,10 @@ const NAME_FIELD_INDEX = 10;
  * survive -- the same trick parseTextLabelsText uses for label text. Lines
  * starting with `//` are comments; blank lines are skipped.
  */
-export function parseBoardsText(text: string): {
+export function parseBoardsText(
+  text: string,
+  ctx?: PlacementContext
+): {
   placements: BoardPlacement[];
   errors: BoardPlacementParseError[];
 } {
@@ -63,11 +68,31 @@ export function parseBoardsText(text: string): {
       continue;
     }
 
-    // Everything except Surface (0) and Components (4) is numeric.
-    const numericTokens = [head[1], head[2], head[3], head[5], head[6], head[7], head[8], head[9]];
-    const nums = numericTokens.map((t) => parseFloat(t));
-    if (nums.some((n) => !Number.isFinite(n))) {
-      errors.push({ line: lineNo, reason: 'non-numeric field' });
+    // Everything except Surface (0) and Components (4) is numeric, and each may
+    // be an arithmetic expression -- see expr.ts.
+    const vars = placementVariables(ctx, surface);
+    const fields: Array<[string, string]> = [
+      ['X', head[1]],
+      ['Y', head[2]],
+      ['Rotation', head[3]],
+      ['StandoffHeight', head[5]],
+      ['StandoffOD', head[6]],
+      ['StandoffHoleDia', head[7]],
+      ['HoleDepth', head[8]],
+      ['BaseFilletRadius', head[9]],
+    ];
+    const nums: number[] = [];
+    let bad: string | null = null;
+    for (const [name, token] of fields) {
+      const { value, error } = evaluateExpression(token, vars);
+      if (value === null) {
+        bad = `${name}: ${error}`;
+        break;
+      }
+      nums.push(value);
+    }
+    if (bad !== null) {
+      errors.push({ line: lineNo, reason: bad });
       continue;
     }
     const [x, y, rotation, standoffHeight, standoffOd, standoffHoleDia, standoffHoleDepth, baseFillet] = nums;

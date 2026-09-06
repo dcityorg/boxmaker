@@ -635,6 +635,29 @@ export const DEFAULT_SNAP: SnapFitParams = {
   nubBoxShrink: 2,
 };
 
+/**
+ * Re-derive the placement lists for a given box/lid.
+ *
+ * Placement fields can be expressions referring to the box -- `maxX - 25.42`
+ * and the like -- so they are NOT a pure function of their text: resizing the
+ * box changes what they evaluate to. Every writer of box or lid has to run this
+ * or the placements silently keep their old numbers.
+ */
+function reparsePlacements(
+  s: { boardsText: string; objectsText: string },
+  box: BoxParams,
+  lid: LidParams
+) {
+  const b = parseBoardsText(s.boardsText, { box, lid });
+  const o = parseObjectPlacementsText(s.objectsText, { box, lid });
+  return {
+    boards: b.placements,
+    boardErrors: b.errors,
+    objects: o.placements,
+    objectErrors: o.errors,
+  };
+}
+
 export const useDesign = create<DesignState>((set) => ({
   designName: null,
   isDirty: false,
@@ -664,10 +687,26 @@ export const useDesign = create<DesignState>((set) => ({
   setAppearance: (patch) =>
     set((s) => ({ appearance: { ...s.appearance, ...patch } })),
   resetAppearance: () => set({ appearance: { ...DEFAULT_APPEARANCE } }),
-  setBox: (patch) => set((s) => ({ box: { ...s.box, ...patch }, isDirty: true })),
-  resetBox: () => set({ box: { ...DEFAULT_BOX }, isDirty: true }),
-  setLid: (patch) => set((s) => ({ lid: { ...s.lid, ...patch }, isDirty: true })),
-  resetLid: () => set({ lid: { ...DEFAULT_LID }, isDirty: true }),
+  setBox: (patch) =>
+    set((s) => {
+      const box = { ...s.box, ...patch };
+      return { box, ...reparsePlacements(s, box, s.lid), isDirty: true };
+    }),
+  resetBox: () =>
+    set((s) => {
+      const box = { ...DEFAULT_BOX };
+      return { box, ...reparsePlacements(s, box, s.lid), isDirty: true };
+    }),
+  setLid: (patch) =>
+    set((s) => {
+      const lid = { ...s.lid, ...patch };
+      return { lid, ...reparsePlacements(s, s.box, lid), isDirty: true };
+    }),
+  resetLid: () =>
+    set((s) => {
+      const lid = { ...DEFAULT_LID };
+      return { lid, ...reparsePlacements(s, s.box, lid), isDirty: true };
+    }),
   setSnap: (patch) => set((s) => ({ snap: { ...s.snap, ...patch }, isDirty: true })),
   resetSnap: () => set({ snap: { ...DEFAULT_SNAP }, isDirty: true }),
   setStandoffsText: (text) => {
@@ -682,14 +721,16 @@ export const useDesign = create<DesignState>((set) => ({
     const { labels, errors } = parseTextLabelsText(text);
     set({ textLabelsText: text, textLabels: labels, textLabelErrors: errors, isDirty: true });
   },
-  setBoardsText: (text) => {
-    const { placements, errors } = parseBoardsText(text);
-    set({ boardsText: text, boards: placements, boardErrors: errors, isDirty: true });
-  },
-  setObjectsText: (text) => {
-    const { placements, errors } = parseObjectPlacementsText(text);
-    set({ objectsText: text, objects: placements, objectErrors: errors, isDirty: true });
-  },
+  setBoardsText: (text) =>
+    set((s) => {
+      const { placements, errors } = parseBoardsText(text, { box: s.box, lid: s.lid });
+      return { boardsText: text, boards: placements, boardErrors: errors, isDirty: true };
+    }),
+  setObjectsText: (text) =>
+    set((s) => {
+      const { placements, errors } = parseObjectPlacementsText(text, { box: s.box, lid: s.lid });
+      return { objectsText: text, objects: placements, objectErrors: errors, isDirty: true };
+    }),
   addObjectToLibrary: (obj) =>
     set((s) => {
       const k = obj.name.trim().toLowerCase();
@@ -750,16 +791,18 @@ export const useDesign = create<DesignState>((set) => ({
     const textLabelsParse = parseTextLabelsText(design.textLabelsText);
     // Boards are optional in the file: designs saved before the feature
     // existed have neither field, and must still load.
-    const boardsParse = parseBoardsText(design.boardsText ?? DEFAULT_BOARDS_TEXT);
-    const objectsParse = parseObjectPlacementsText(design.objectsText ?? DEFAULT_OBJECTS_TEXT);
+    const box = { ...DEFAULT_BOX, ...design.box };
+    const lid = { ...DEFAULT_LID, ...design.lid };
+    const boardsParse = parseBoardsText(design.boardsText ?? DEFAULT_BOARDS_TEXT, { box, lid });
+    const objectsParse = parseObjectPlacementsText(design.objectsText ?? DEFAULT_OBJECTS_TEXT, { box, lid });
     set({
       designName: design.designName,
       // Merge with DEFAULT_APPEARANCE so older JSONs (saved before a field
       // existed) pick up the new field's default instead of leaving it
       // undefined. Same for box/lid/snap below.
       appearance: { ...DEFAULT_APPEARANCE, ...design.appearance },
-      box: { ...DEFAULT_BOX, ...design.box },
-      lid: { ...DEFAULT_LID, ...design.lid },
+      box,
+      lid,
       snap: { ...DEFAULT_SNAP, ...design.snap },
       standoffsText: design.standoffsText,
       standoffs: standoffsParse.standoffs,

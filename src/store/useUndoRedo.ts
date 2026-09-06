@@ -107,8 +107,9 @@ export function useUndoRedo() {
     const standoffsParse = parseStandoffsText(s.standoffsText);
     const cutoutsParse = parseCutoutsText(s.cutoutsText);
     const textLabelsParse = parseTextLabelsText(s.textLabelsText);
-    const boardsParse = parseBoardsText(s.boardsText);
-    const objectsParse = parseObjectPlacementsText(s.objectsText);
+    // Placement expressions depend on the box, so parse against the snapshot's.
+    const boardsParse = parseBoardsText(s.boardsText, { box: s.box, lid: s.lid });
+    const objectsParse = parseObjectPlacementsText(s.objectsText, { box: s.box, lid: s.lid });
     useDesign.setState({
       designName: s.designName,
       appearance: { ...s.appearance },

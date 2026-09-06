@@ -1,6 +1,8 @@
 'use client';
 
 import type { BoxSurface, ObjectPlacement, ObjectPlacementParseError } from './types';
+import { evaluateExpression } from './expr';
+import { placementVariables, type PlacementContext } from './placementVars';
 
 const SURFACES: BoxSurface[] = ['front', 'back', 'left', 'right', 'floor', 'lid'];
 
@@ -15,7 +17,10 @@ const SURFACES: BoxSurface[] = ['front', 'back', 'left', 'right', 'floor', 'lid'
  * Offset is the gap between the surface and the object's base face -- 0 for
  * something stuck straight to the wall, more for something on a spacer.
  */
-export function parseObjectPlacementsText(text: string): {
+export function parseObjectPlacementsText(
+  text: string,
+  ctx?: PlacementContext
+): {
   placements: ObjectPlacement[];
   errors: ObjectPlacementParseError[];
 } {
@@ -54,9 +59,21 @@ export function parseObjectPlacementsText(text: string): {
       continue;
     }
 
-    const nums = head.slice(1).map((t) => parseFloat(t));
-    if (nums.some((n) => !Number.isFinite(n))) {
-      errors.push({ line: lineNo, reason: 'non-numeric field' });
+    // Each numeric field may be an arithmetic expression -- see expr.ts.
+    const vars = placementVariables(ctx, surface);
+    const names = ['X', 'Y', 'Rotation', 'Offset'];
+    const nums: number[] = [];
+    let bad: string | null = null;
+    for (let f = 0; f < 4; f++) {
+      const { value, error } = evaluateExpression(head[f + 1], vars);
+      if (value === null) {
+        bad = `${names[f]}: ${error}`;
+        break;
+      }
+      nums.push(value);
+    }
+    if (bad !== null) {
+      errors.push({ line: lineNo, reason: bad });
       continue;
     }
     const [x, y, rotation, offset] = nums;

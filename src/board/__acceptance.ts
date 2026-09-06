@@ -18,6 +18,7 @@ import type { BoardEdge, BoardPlacement, ObjectPlacement } from './types';
 import { boardEnvelope, objectEnvelope, envelopesOverlap, interferenceWarnings, interferenceFor } from './envelopes';
 import { parseObjectFile } from './parseObject';
 import { parseObjectPlacementsText } from './parseObjectPlacements';
+import { evaluateExpression } from './expr';
 import { compileObject } from './compileObject';
 import { standoffWarnings } from '../validation/checks';
 
@@ -478,5 +479,47 @@ check('touching faces do not count as a clash',
   !envelopesOverlap(potAt('floor', 0, 0), potAt('floor', 16, 0)));
 check('a 1mm overlap does count',
   envelopesOverlap(potAt('floor', 0, 0), potAt('floor', 15, 0)));
+
+console.log('\n[19] arithmetic in placement fields');
+const ev = (t: string, v = {}) => evaluateExpression(t, v);
+check('a bare number still works', ev('46.88').value === 46.88);
+// 46.879999999999995, not 46.88: ordinary IEEE arithmetic, and the same drift
+// the app already stores from its own sliders (2.8000000000000003 lives in the
+// shipped examples). 5e-15 mm is not a geometry problem, so results are NOT
+// rounded -- rounding would be a lie about precision the numbers never had.
+check('subtraction', near(ev('76 - 25.42 - 3.7').value ?? 0, 46.88, 1e-12),
+  `${ev('76 - 25.42 - 3.7').value}`);
+check('precedence and parens', ev('2 + 3 * 4').value === 14 && ev('(2 + 3) * 4').value === 20);
+check('unary minus', ev('-5').value === -5 && ev('10 - -5').value === 15);
+check('division', ev('50.8 / 2').value === 25.4);
+check('whitespace is irrelevant', ev('  1+2  ').value === 3);
+check('division by zero is an error', ev('1/0').error !== null);
+check('trailing rubbish is an error, where parseFloat used to ignore it',
+  ev('46.88abc').error !== null && ev('1 2').error !== null);
+check('unbalanced parens are an error', ev('(1 + 2').error !== null);
+check('an unknown name is an error naming what IS known',
+  /unknown name "nope".*known: maxX/.test(ev('nope', { maxX: 5 }).error ?? ''),
+  ev('nope', { maxX: 5 }).error ?? '');
+
+console.log('\n[19b] ACCEPTANCE: maxX puts a part against the far edge');
+// Gary's actual line was `right,46.88,...` with 46.88 derived in a comment from
+// 76 - 25.42 - 3.7. Written as an expression it needs no hard-coded 76.
+const CTX = { box: BOX, lid: LID };
+const spanRight = BOX.width - 2 * BOX.wallThickness;   // 82 - 5 = 77
+const withVar = parseObjectPlacementsText('right, maxX - 25.42 - 3.7, 0, 0, 0, sen66', CTX);
+check('parses', withVar.errors.length === 0, JSON.stringify(withVar.errors));
+check('maxX is the surface span, agreeing with the bounds check',
+  near(withVar.placements[0].x, spanRight - 25.42 - 3.7, 1e-9), `${withVar.placements[0].x}`);
+check('maxY is the OTHER axis of the same surface',
+  near(parseObjectPlacementsText('right, 0, maxY, 0, 0, x', CTX).placements[0].y,
+       BOX.height - BOX.floorThickness, 1e-9));
+check('maxX differs per surface -- the floor is longer than the right wall',
+  parseObjectPlacementsText('floor, maxX, 0, 0, 0, x', CTX).placements[0].x ===
+    BOX.length - 2 * BOX.wallThickness);
+check('board placements take expressions too',
+  near(parseBoardsText('floor, maxX - 10, 0, 0, up, 6, 6, 2.6, 8, 1, B', CTX).placements[0].x,
+       BOX.length - 2 * BOX.wallThickness - 10, 1e-9));
+check('a variable without a box context is a clear error, not a silent zero',
+  parseObjectPlacementsText('right, maxX, 0, 0, 0, x').errors.length === 1);
 
 console.log(`\n${failures === 0 ? 'ALL CHECKS PASSED' : failures + ' CHECK(S) FAILED'}\n`);

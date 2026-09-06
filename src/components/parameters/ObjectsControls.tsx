@@ -240,6 +240,19 @@ export function ObjectsControls() {
           <div>Offset = gap between the surface and the object (mm); 0 = touching</div>
           <div>ObjectName = name from an imported object file</div>
           <div className="mt-1">
+            Any number can be an expression: <code className="not-italic">+ - * /</code> and parentheses.
+            Names you can use: <code className="not-italic">maxX</code>, <code className="not-italic">maxY</code>{' '}
+            (the extent of the surface this line names, in its own frame),{' '}
+            <code className="not-italic">boxL</code>, <code className="not-italic">boxW</code>,{' '}
+            <code className="not-italic">boxH</code>, <code className="not-italic">wall</code>,{' '}
+            <code className="not-italic">floor</code>.
+          </div>
+            <div>
+            So <code className="not-italic">maxX - 25.42 - 3.7</code> sits a 25.42 mm part against the far
+            edge with a 3.7 mm gap — and stays there if you resize the box, which a typed-out number would
+            not.
+          </div>
+          <div className="mt-1">
             The body is drawn for clearance only and is never exported. Its cutouts DO cut real holes.
           </div>
         </div>
