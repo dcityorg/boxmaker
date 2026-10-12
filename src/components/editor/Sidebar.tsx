@@ -45,6 +45,7 @@ import {
 } from '@/board/fileHandles';
 import { buildZip } from '@/geometry/zip';
 import { build3MF } from '@/geometry/export3MF';
+import { dcCountExport } from '@/lib/analytics';
 
 interface SidebarProps {
   helpOpen: boolean;
@@ -286,6 +287,7 @@ export function Sidebar({ helpOpen, onToggleHelp, undo, redo, canUndo, canRedo }
       const buf = build3MF(parts);
       for (const p of parts) p.manifold.delete();
       downloadBinary(buf, `${baseName}.3mf`);
+      dcCountExport('boxmaker-export-3mf');
     } catch (err) {
       console.error('[BoxMaker] 3MF export failed:', err);
       alert('3MF export failed -- check console.');
@@ -336,6 +338,7 @@ export function Sidebar({ helpOpen, onToggleHelp, undo, redo, canUndo, canRedo }
 
       const zip = buildZip(zipEntries);
       downloadBinary(zip, `${baseName}.zip`);
+      dcCountExport('boxmaker-export-stl');
     } catch (err) {
       console.error('[BoxMaker] STL export failed:', err);
       alert('STL export failed — check console.');
